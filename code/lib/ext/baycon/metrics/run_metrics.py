@@ -2,7 +2,7 @@ import glob
 
 import pandas as pd
 
-from InstancesMetrics import InstancesMetrics
+from lib.ext.baycon.InstancesMetrics import InstancesMetrics
 
 dataset_folder = "datasets/"
 for experiment_file in glob.iglob('*.json'):

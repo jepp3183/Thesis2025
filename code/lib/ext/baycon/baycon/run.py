@@ -2,10 +2,10 @@ import json
 
 import pandas as pd
 
-import baycon.bayesian_generator as baycon
-import baycon.time_measurement as time_measurement
-from common.DataAnalyzer import *
-from common.Target import Target
+import lib.ext.baycon.baycon.bayesian_generator as baycon
+import lib.ext.baycon.baycon.time_measurement as time_measurement
+from lib.ext.baycon.common.DataAnalyzer import *
+from lib.ext.baycon.common.Target import Target
 
 
 class ModelWrapper:

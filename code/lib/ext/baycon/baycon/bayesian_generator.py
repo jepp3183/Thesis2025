@@ -2,13 +2,13 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import LocalOutlierFactor
 
-import baycon.time_measurement as time_measurement
-from baycon.InstancesGenerator import InstancesGenerator
-from baycon.InstancesInfo import InstancesInfo
-from baycon.SurrogateRanker import SurrogateRanker
-from common import numpy_utils as npu
-from common.ScoreCalculator import ScoreCalculator
-from common.Target import *
+import lib.ext.baycon.baycon.time_measurement as time_measurement
+from lib.ext.baycon.baycon.InstancesGenerator import InstancesGenerator
+from lib.ext.baycon.baycon.InstancesInfo import InstancesInfo
+from lib.ext.baycon.baycon.SurrogateRanker import SurrogateRanker
+from lib.ext.baycon.common import numpy_utils as npu
+from lib.ext.baycon.common.ScoreCalculator import ScoreCalculator
+from lib.ext.baycon.common.Target import *
 
 EPOCHS_THRESHOLD = 100  # overall number of epochs to run the algorithm
 GLOBAL_NO_IMPROVEMENT_THRESHOLD = 10  # improvement on amount of epochs to stop without having improvements.

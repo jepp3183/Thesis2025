@@ -9,9 +9,9 @@ import fatf.utils.data.datasets as fatf_datasets
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from common.DataAnalyzer import *
-from common.ScoreCalculator import ScoreCalculator
-from common.Target import Target
+from lib.ext.baycon.common.DataAnalyzer import *
+from lib.ext.baycon.common.ScoreCalculator import ScoreCalculator
+from lib.ext.baycon.common.Target import Target
 
 
 # The dataset file must be formatted in the *comma separated value* (*csv*)

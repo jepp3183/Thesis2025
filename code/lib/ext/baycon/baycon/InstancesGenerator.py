@@ -1,6 +1,6 @@
 import numpy as np
 
-from common import numpy_utils as npu
+from lib.ext.baycon.common import numpy_utils as npu
 
 
 class InstancesGenerator:

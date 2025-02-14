@@ -3,9 +3,9 @@ from collections import Counter
 
 import pandas as pd
 
-from common.DataAnalyzer import *
-from common.ScoreCalculator import ScoreCalculator
-from common.Target import Target
+from lib.ext.baycon.common.DataAnalyzer import *
+from lib.ext.baycon.common.ScoreCalculator import ScoreCalculator
+from lib.ext.baycon.common.Target import Target
 
 
 def count_and_sort(elements, reverse=False):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from common.Target import Target
+from lib.ext.baycon.common.Target import Target
 
 
 def encode(X, categorical_features):

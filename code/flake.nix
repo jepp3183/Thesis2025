@@ -19,7 +19,6 @@
                 ipython
                 ipykernel
                 jupyter
-                jupyter-collaboration
                 notebook
                 tqdm
                 matplotlib

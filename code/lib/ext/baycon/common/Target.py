@@ -1,7 +1,8 @@
 class Target:
-    TARGET_TYPES = ['classification', 'regression']
+    TARGET_TYPES = ['classification', 'regression', 'clustering_kmeans']
     TYPE_CLASSIFICATION = TARGET_TYPES[0]
     TYPE_REGRESSION = TARGET_TYPES[1]
+    TYPE_CLUSTERING_KMEANS = TARGET_TYPES[2]
     REGRESSION_VALUES = [float('-inf'), float('inf')]
     REGRESSION_DECREASE = REGRESSION_VALUES[0]
     REGRESSION_INCREASE = REGRESSION_VALUES[1]
@@ -13,6 +14,8 @@ class Target:
 
         assert target_type in self.TARGET_TYPES
         if target_type == self.TYPE_CLASSIFICATION:
+            assert isinstance(target_value, int) or isinstance(target_value, str)
+        elif target_type == self.TYPE_CLUSTERING_KMEANS:
             assert isinstance(target_value, int) or isinstance(target_value, str)
         elif target_type == self.TYPE_REGRESSION:
             if self.is_range():

@@ -34,17 +34,14 @@ class ScoreCalculatorKmeans:
     def fitness_score(self, instances, predictions):
         # calculate closeness of the potential counterfactual to the initial instance.
         score_x = self.score_x(self._initial_instance, instances)
-        
         score_y = self.score_y(instances)
         score_f = self.score_f(instances)
+        print(score_x,score_y,score_f)
         assert (score_x >= 0).all() and (score_y >= 0).all() and (score_f >= 0).all()
         fitness_score = score_x * score_y * score_f
         return np.round((fitness_score, score_x, score_y, score_f), 5)
     
     def score_y(self, instances):
-
-        print(self._target_cluster_center)
-        print(instances)
         center_distances = self.euclidean_distance(instances)
         return 1 - ((center_distances - self._min_target_cluster_distance)/(self._max_target_cluster_distance - self._min_target_cluster_distance))
     

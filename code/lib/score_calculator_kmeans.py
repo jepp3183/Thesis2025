@@ -36,15 +36,19 @@ class ScoreCalculatorKmeans:
         score_x = self.score_x(self._initial_instance, instances)
         score_y = self.score_y(instances)
         score_f = self.score_f(instances)
-        print(score_x,score_y,score_f)
+        # print(score_x,score_y,score_f)
         assert (score_x >= 0).all() and (score_y >= 0).all() and (score_f >= 0).all()
         fitness_score = score_x * score_y * score_f
         return np.round((fitness_score, score_x, score_y, score_f), 5)
     
     def score_y(self, instances):
         center_distances = self.euclidean_distance(instances)
-        return 1 - ((center_distances - self._min_target_cluster_distance)/(self._max_target_cluster_distance - self._min_target_cluster_distance))
-    
+        y_score = 1 - ((center_distances - self._min_target_cluster_distance)/(self._max_target_cluster_distance - self._min_target_cluster_distance))
+        y_score[y_score < 0] = 0
+        y_score[y_score > 1] = 1
+        return y_score
+        
+
     def euclidean_distance(self, y):
         prediction_distances = [np.linalg.norm(i-self._target_cluster_center) for i in y]
         return prediction_distances

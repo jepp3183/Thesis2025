@@ -63,8 +63,6 @@ def Simple_CF_Descent(
                 else:
                     penalty = np.pow([feature_penalty], [len(changed_features)])[0]
 
-            print(penalty)
-
             cf_prime = cf.copy()
 
             step = y[i] - cf_prime[i]

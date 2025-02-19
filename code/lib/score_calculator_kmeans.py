@@ -21,19 +21,20 @@ def score_y_reaching_target(min_value, turning_point, predictions, max_value):
 class ScoreCalculatorKmeans:
     SCORE_JITTER = 0.95
 
-    def __init__(self, initial_instance, initial_prediction, target, data_analyzer, base_calculator, min_cluster_distances, max_cluster_distances, cluster_centers):
+    def __init__(self, initial_instance, initial_prediction, target, data_analyzer, base_calculator, min_target_cluster_distance, max_target_cluster_distance, target_cluster_center):
         self._standard_score_calculator = base_calculator
         self._initial_instance = initial_instance
         self._initial_prediction = initial_prediction
         self._target = target
         self._data_analyzer = data_analyzer
-        self._min_cluster_distances = min_cluster_distances
-        self._max_cluster_distances = max_cluster_distances
-        self._cluster_centers = cluster_centers
+        self._min_target_cluster_distance = min_target_cluster_distance
+        self._max_target_cluster_distance = max_target_cluster_distance
+        self._target_cluster_center = target_cluster_center
 
     def fitness_score(self, instances, predictions):
         # calculate closeness of the potential counterfactual to the initial instance.
         score_x = self.score_x(self._initial_instance, instances)
+        
         score_y = self.score_y(instances)
         score_f = self.score_f(instances)
         assert (score_x >= 0).all() and (score_y >= 0).all() and (score_f >= 0).all()
@@ -41,10 +42,14 @@ class ScoreCalculatorKmeans:
         return np.round((fitness_score, score_x, score_y, score_f), 5)
     
     def score_y(self, instances):
-        return 1 - (self.euclidean_distance(instances) - self._min_cluster_distances[self._target.target_value()])/(self._max_cluster_distances[self._target.target_value()] - self._min_cluster_distances[self._target.target_value()])
+
+        print(self._target_cluster_center)
+        print(instances)
+        center_distances = self.euclidean_distance(instances)
+        return 1 - ((center_distances - self._min_target_cluster_distance)/(self._max_target_cluster_distance - self._min_target_cluster_distance))
     
     def euclidean_distance(self, y):
-        prediction_distances = [np.linalg.norm(i-self._cluster_centers[self._target.target_value()]) for i in y]
+        prediction_distances = [np.linalg.norm(i-self._target_cluster_center) for i in y]
         return prediction_distances
 
     def gower_distance(self, origin_instance, instances):

@@ -2,6 +2,16 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
+import os, sys
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 def plot_cluster_cf(X, cluster_labels, cf, initial_point_idx):
     if X.shape[1] != 2:

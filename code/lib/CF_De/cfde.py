@@ -1,5 +1,22 @@
 import numpy as np
 import random
+import pandas as pd
+
+def CF_Descent(
+        X,
+        y, 
+        target, 
+        centers, 
+        model=None, 
+        instance_index=-1, 
+        stop_count=100, 
+        step_size=0.05, 
+        limit = 10000,
+        feature_penalty = 1.001, 
+        dis = lambda a,b : euclid_dis(a,b)):
+    
+    df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
+    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis)
 
 def Simple_CF_Descent(
         df, 

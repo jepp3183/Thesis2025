@@ -14,16 +14,14 @@ def CF_Descent(
         limit = 10000,
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
-        immutable_features = [],
-        new_immutable_ration = 0.35):
+        immutable_features = []):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
-    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, new_immutable_ration)
+    return Simple_CF_Ascent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features)
 
 
-#TODO start by greedily setting features to the instance choosing features that change the distance the least, then do descent afterwards!!!
-def Simple_CF_Descent(
-        df, 
+def Simple_CF_Ascent(
+        df,
         target, 
         centers, 
         model=None, 
@@ -33,8 +31,7 @@ def Simple_CF_Descent(
         limit = 10000,
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
-        immutable_features = [],
-        new_immutable_ration = 0.4):
+        immutable_features = []):
 
     predictor = None
     if model == None:
@@ -52,9 +49,9 @@ def Simple_CF_Descent(
     else:
         predictor = lambda p : model.predict([p])[0]
 
-    cf = centers[int(target)].copy()
     target_points = df[df["label"] == target]
 
+    pred_instance = 0.0
     if instance_index == -1:
         while True:
             index = random.randint(0,len(df.values))
@@ -70,43 +67,9 @@ def Simple_CF_Descent(
     misses = 0
     instance = df.values[instance_index][:-1]
 
-    # taking care of immutables
-    for f in immutable_features:
-        cf[f] = instance[f].copy()
+    cf = centers[int(target)].copy()
 
-    #First we need to reset some features to obtain minimality
-    found_starting_point = False
-    temp_imuts = immutable_features.copy()
-    while found_starting_point == False:
-        
-        if float(len(temp_imuts))/float(len(instance)) > new_immutable_ration:
-            break
-
-        smallest_distance = float('inf')
-        best_feature = -1
-        for f in range(len(instance)):
-            if f in temp_imuts:
-                continue
-
-            cf_prime = cf.copy()
-
-            cf_prime[f] = instance[f].copy()
-            distance_new = dis(cf_prime, instance)
-
-            if distance_new < smallest_distance:
-                pre_class = predictor(cf_prime)
-                if pre_class == target:
-                    smallest_distance = distance_new
-                    best_feature = f
-                
-        if best_feature == -1:
-            found_starting_point = True
-        else:
-            cf[best_feature] = instance[best_feature].copy()
-            temp_imuts.append(best_feature)
-
-    immutable_features = temp_imuts
-    print("Features that can be changed count: ", len(instance) - len(immutable_features))
+    target_center = centers[int(target)].copy()
 
     it = 0
     changed_features = []
@@ -131,15 +94,15 @@ def Simple_CF_Descent(
             
             cf_prime[i] += step * step_size
 
-            distance_new = dis(cf_prime, instance) * penalty
+            distance_new = dis(cf_prime, target_center) * penalty
 
-            if distance_new < current_dis:
+            if distance_new > current_dis:
                 changes.append((cf_prime,distance_new, i))
 
         if len(changes) == 0:
             misses += 1
         else:
-            best = min(changes, key = lambda x: x[1])
+            best = max(changes, key = lambda x: x[1])
             f = best[2]
             best = best[0]
             if all([x == y for x,y in zip(cf,best)]):
@@ -147,14 +110,16 @@ def Simple_CF_Descent(
             else:    
                 try:
                     prediction = predictor(best)
-                    if prediction != target:
-                        misses += 1
-                    else:
+                    if prediction == target:
+                        break
+                    elif prediction == pred_instance:
                         cf = best
                         misses = 0
                         history.append(best)
                         if f not in changed_features:
                             changed_features.append(f)
+                    else:
+                        misses += 1
                 except ValueError:
                     print("fail")
                     misses += 1

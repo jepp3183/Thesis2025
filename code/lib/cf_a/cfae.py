@@ -67,7 +67,7 @@ def Simple_CF_Ascent(
     misses = 0
     instance = df.values[instance_index][:-1]
 
-    cf = centers[int(target)].copy()
+    cf = instance.copy()
 
     target_center = centers[int(target)].copy()
 
@@ -76,7 +76,7 @@ def Simple_CF_Ascent(
     while misses < stop_count and it < limit:
         y = target_points.sample().values[0][:-1]
         changes = []
-        current_dis = dis(cf, instance)
+        current_dis = dis(cf, target_center)
 
         for i in range(len(y)):
             if i in immutable_features:
@@ -96,13 +96,13 @@ def Simple_CF_Ascent(
 
             distance_new = dis(cf_prime, target_center) * penalty
 
-            if distance_new > current_dis:
+            if distance_new < current_dis:
                 changes.append((cf_prime,distance_new, i))
 
         if len(changes) == 0:
             misses += 1
         else:
-            best = max(changes, key = lambda x: x[1])
+            best = min(changes, key = lambda x: x[1])
             f = best[2]
             best = best[0]
             if all([x == y for x,y in zip(cf,best)]):

@@ -15,10 +15,10 @@ def CF_Descent(
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
         immutable_features = [],
-        new_immutable_ration = 0.35):
+        new_immutable_ratio = 0.35):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
-    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, new_immutable_ration)
+    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, new_immutable_ratio)
 
 
 #TODO start by greedily setting features to the instance choosing features that change the distance the least, then do descent afterwards!!!
@@ -34,7 +34,7 @@ def Simple_CF_Descent(
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
         immutable_features = [],
-        new_immutable_ration = 0.4):
+        new_immutable_ratio = 0.35):
 
     predictor = None
     if model == None:
@@ -79,7 +79,7 @@ def Simple_CF_Descent(
     temp_imuts = immutable_features.copy()
     while found_starting_point == False:
         
-        if float(len(temp_imuts))/float(len(instance)) > new_immutable_ration:
+        if float(len(temp_imuts))/float(len(instance)) > new_immutable_ratio:
             break
 
         smallest_distance = float('inf')

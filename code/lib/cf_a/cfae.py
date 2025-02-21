@@ -2,7 +2,7 @@ import numpy as np
 import random
 import pandas as pd
 
-def CF_Descent(
+def CF_Ascent(
         X,
         y, 
         target, 
@@ -14,10 +14,11 @@ def CF_Descent(
         limit = 10000,
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
-        immutable_features = []):
+        immutable_features = [],
+        center_mode = True):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
-    return Simple_CF_Ascent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features)
+    return Simple_CF_Ascent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, center_mode)
 
 
 def Simple_CF_Ascent(
@@ -31,7 +32,8 @@ def Simple_CF_Ascent(
         limit = 10000,
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
-        immutable_features = []):
+        immutable_features = [],
+        center_mode = True):
 
     predictor = None
     if model == None:
@@ -69,14 +71,18 @@ def Simple_CF_Ascent(
 
     cf = instance.copy()
 
-    target_center = centers[int(target)].copy()
+    target_metric = centers[int(target)].copy()
 
     it = 0
     changed_features = []
     while misses < stop_count and it < limit:
         y = target_points.sample().values[0][:-1]
         changes = []
-        current_dis = dis(cf, target_center)
+
+        if (center_mode == False):
+            target_metric = target_points.sample().values[0][:-1]
+
+        current_dis = dis(cf, target_metric)
 
         for i in range(len(y)):
             if i in immutable_features:
@@ -94,7 +100,7 @@ def Simple_CF_Ascent(
             
             cf_prime[i] += step * step_size
 
-            distance_new = dis(cf_prime, target_center) * penalty
+            distance_new = dis(cf_prime, target_metric) * penalty
 
             if distance_new < current_dis:
                 changes.append((cf_prime,distance_new, i))

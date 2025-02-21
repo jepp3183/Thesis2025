@@ -12,12 +12,16 @@ def CF_Descent(
         stop_count=100, 
         step_size=0.05, 
         limit = 10000,
-        feature_penalty = 1.001, 
-        dis = lambda a,b : euclid_dis(a,b)):
+        feature_penalty = 2.0, 
+        dis = lambda a,b : euclid_dis(a,b),
+        immutable_features = [],
+        new_immutable_ration = 0.35):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
-    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis)
+    return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, new_immutable_ration)
 
+
+#TODO start by greedily setting features to the instance choosing features that change the distance the least, then do descent afterwards!!!
 def Simple_CF_Descent(
         df, 
         target, 
@@ -28,7 +32,9 @@ def Simple_CF_Descent(
         step_size=0.05, 
         limit = 10000,
         feature_penalty = 1.001, 
-        dis = lambda a,b : euclid_dis(a,b)):
+        dis = lambda a,b : euclid_dis(a,b),
+        immutable_features = [],
+        new_immutable_ration = 0.4):
 
     predictor = None
     if model == None:
@@ -46,24 +52,61 @@ def Simple_CF_Descent(
     else:
         predictor = lambda p : model.predict([p])[0]
 
-    cf = centers[int(target)]
+    cf = centers[int(target)].copy()
     target_points = df[df["label"] == target]
 
     if instance_index == -1:
         while True:
             index = random.randint(0,len(df.values))
-            new_instance = df.values[index]
-            if new_instance[-1] != target:
+            new_instance = df.values[index][:-1]
+            pred = predictor(new_instance)
+            if pred != target:
+                print("Generation counterfacutal from cluster: " + str(pred) + " , Into cluster: " + str(target))
                 instance_index = index
                 break
 
 
     history = []
     misses = 0
-    instance = df.values[instance_index]
-    if instance[-1] == target:
-        raise Exception("cannot create CF for current class")
-    instance = instance[:-1]
+    instance = df.values[instance_index][:-1]
+
+    # taking care of immutables
+    for f in immutable_features:
+        cf[f] = instance[f].copy()
+
+    #First we need to reset some features to obtain minimality
+    found_starting_point = False
+    temp_imuts = immutable_features.copy()
+    while found_starting_point == False:
+        
+        if float(len(temp_imuts))/float(len(instance)) > new_immutable_ration:
+            break
+
+        smallest_distance = float('inf')
+        best_feature = -1
+        for f in range(len(instance)):
+            if f in temp_imuts:
+                continue
+
+            cf_prime = cf.copy()
+
+            cf_prime[f] = instance[f].copy()
+            distance_new = dis(cf_prime, instance)
+
+            if distance_new < smallest_distance:
+                pre_class = predictor(cf_prime)
+                if pre_class == target:
+                    smallest_distance = distance_new
+                    best_feature = f
+                
+        if best_feature == -1:
+            found_starting_point = True
+        else:
+            cf[best_feature] = instance[best_feature].copy()
+            temp_imuts.append(best_feature)
+
+    immutable_features = temp_imuts
+    print("Features that can be changed count: ", len(instance) - len(immutable_features))
 
     it = 0
     changed_features = []
@@ -73,6 +116,8 @@ def Simple_CF_Descent(
         current_dis = dis(cf, instance)
 
         for i in range(len(y)):
+            if i in immutable_features:
+                continue
             penalty = 1.0
             if i not in changed_features:
                 if len(changed_features) == 0:
@@ -102,7 +147,7 @@ def Simple_CF_Descent(
             else:    
                 try:
                     prediction = predictor(best)
-                    if prediction != int(target):
+                    if prediction != target:
                         misses += 1
                         it += 1
                     else:
@@ -117,7 +162,7 @@ def Simple_CF_Descent(
         it += 1
 
     if len(history) == 0:
-        history.append((cf,0))
+        history.append(cf)
     print("Amount of changes: ", len(history))
     print("Number of changed features:",len(changed_features))
     return instance,cf,history

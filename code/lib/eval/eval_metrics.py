@@ -1,17 +1,15 @@
 import numpy as np
 from lib.eval.tools import euclid_dis
 from lib.eval.tools import center_prediction
-from lib.eval.tools import minimality_metric
 from sklearn.neighbors import LocalOutlierFactor
 
-euclid_par = lambda a,b : euclid_dis(a,b)
-prediction_par = lambda a, centers : center_prediction(a, centers)
-mini_par = lambda a,b : minimality_metric(a,b)
+def cf_similarity(cf, instance, dis = euclid_dis) -> float:
+    assert len(cf.shape) == 2
+    return np.array([dis(instance, cf_i) for cf_i in cf])
 
-def cf_similarity(instance, cf, dis = euclid_par) -> float:
-    return dis(instance, cf)
+def cf_validity(cf, instance_cluster, centers, eval = center_prediction) -> float:
+    assert len(cf.shape) == 2
 
-def cf_validity(cf, instance_cluster, centers, eval = prediction_par) -> float:
     return float(instance_cluster) != eval(cf, centers)
 
 def cf_plausibility(cf, target, X, y) -> float:
@@ -24,5 +22,10 @@ def cf_plausibility(cf, target, X, y) -> float:
     pred = clf.score_samples(cf)
     return pred
 
-def cf_minimality(cf, instance, eval = mini_par) -> float:
-    return eval(cf, instance)
+def cf_minimality(cf, instance) -> float:
+    assert len(cf.shape) == 2
+
+    res = np.equal(cf, instance).mean(axis=1)
+    if len(res) == 1:
+        return res[0]
+    return res

@@ -1,0 +1,12 @@
+ipython
+ipykernel
+jupyter
+notebook
+tqdm
+matplotlib
+numpy==1.26.3
+scikit-learn
+pandas
+seaborn
+interpret
+# dice-ml

@@ -8,5 +8,7 @@ numpy==1.26.3
 scikit-learn
 pandas
 seaborn
-interpret
+mmd-critic
+torch
+# interpret
 # dice-ml

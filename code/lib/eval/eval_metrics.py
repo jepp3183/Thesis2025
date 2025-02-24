@@ -13,6 +13,7 @@ def cf_validity(cf, instance_cluster, centers, eval = center_prediction) -> floa
     return float(instance_cluster) != eval(cf, centers)
 
 def cf_plausibility(cf, target, X, y) -> float:
+    print(cf)
     assert len(cf.shape) == 2
     
     clf = LocalOutlierFactor(n_neighbors=20, contamination=0.1, novelty=True)

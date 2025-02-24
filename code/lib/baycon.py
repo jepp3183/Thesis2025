@@ -7,6 +7,7 @@ import lib.ext.baycon.baycon.time_measurement as time_measurement
 from lib.ext.baycon.common.DataAnalyzer import *
 from lib.ext.baycon.common.Target import Target
 from lib.util import HiddenPrints
+from lib.ext.baycon.common.ScoreCalculator import ScoreCalculator
 
 def execute(df, model, target, initial_instance_index, categorical_features=[], actionable_features=[]):
     y = df[[target.target_feature()]].values.ravel()
@@ -23,7 +24,8 @@ def execute(df, model, target, initial_instance_index, categorical_features=[], 
         target.target_value_as_string(),
         run
     ))
-    counterfactuals, ranker = baycon.run(initial_instance, initial_prediction, target, data_analyzer, model)
+    base_calculator = ScoreCalculator(initial_instance, initial_prediction, target, data_analyzer)
+    counterfactuals, ranker = baycon.run(initial_instance, initial_prediction, target, data_analyzer, model, base_calculator)
     predictions = np.array([])
     try:
         predictions = model.predict(counterfactuals)

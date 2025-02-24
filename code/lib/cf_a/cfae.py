@@ -59,11 +59,16 @@ def Simple_CF_Ascent(
             index = random.randint(0,len(df.values))
             new_instance = df.values[index][:-1]
             pred = predictor(new_instance)
+            pred_instance = pred
             if pred != target:
-                print("Generation counterfacutal from cluster: " + str(pred) + " , Into cluster: " + str(target))
                 instance_index = index
                 break
-
+    else:
+        new_instance = df.values[instance_index][:-1]
+        pred = predictor(new_instance)
+        pred_instance = pred
+        if pred == target:
+            raise Exception("Faulty instance were given, target does not match")
 
     history = []
     misses = 0
@@ -127,16 +132,12 @@ def Simple_CF_Ascent(
                     else:
                         misses += 1
                 except ValueError:
-                    print("fail")
                     misses += 1
         it += 1
 
-    a_cha = len(history)
     if len(history) == 0:
         history.append(cf)
-        a_cha = 0
-    print("Amount of changes: ", a_cha)
-    print("Number of changed features:",len(changed_features))
+        
     return instance,cf,history
 
 def euclid_dis(x,y):

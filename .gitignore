@@ -170,3 +170,4 @@ cython_debug/
 .pypirc
 .direnv
 thesis/*.pdf
+.aider*

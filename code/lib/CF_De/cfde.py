@@ -15,7 +15,7 @@ def CF_Descent(
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
         immutable_features = [],
-        new_immutable_ratio = 0.35):
+        new_immutable_ratio = 0.3):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
     return Simple_CF_Descent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, new_immutable_ratio)
@@ -34,7 +34,7 @@ def Simple_CF_Descent(
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
         immutable_features = [],
-        new_immutable_ratio = 0.35):
+        new_immutable_ratio = 0.3):
 
     predictor = None
     if model == None:
@@ -61,7 +61,6 @@ def Simple_CF_Descent(
             new_instance = df.values[index][:-1]
             pred = predictor(new_instance)
             if pred != target:
-                print("Generation counterfacutal from cluster: " + str(pred) + " , Into cluster: " + str(target))
                 instance_index = index
                 break
 
@@ -106,7 +105,6 @@ def Simple_CF_Descent(
             temp_imuts.append(best_feature)
 
     immutable_features = temp_imuts
-    print("Features that can be changed count: ", len(instance) - len(immutable_features))
 
     it = 0
     changed_features = []
@@ -156,7 +154,6 @@ def Simple_CF_Descent(
                         if f not in changed_features:
                             changed_features.append(f)
                 except ValueError:
-                    print("fail")
                     misses += 1
         it += 1
 
@@ -164,8 +161,6 @@ def Simple_CF_Descent(
     if len(history) == 0:
         history.append(cf)
         a_cha = 0
-    print("Amount of changes: ", a_cha)
-    print("Number of changed features:",len(changed_features))
     return instance,cf,history
 
 def euclid_dis(x,y):

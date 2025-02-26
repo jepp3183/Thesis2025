@@ -17,7 +17,7 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
         
         for cf_data in cfs_data:
             metric = []
-            cf = cf_data.cf
+            cf = np.array(cf_data.cf)
             instance = X[cf_data.instance]
             target = cf_data.target
             instance_cluster = cf_data.instance_label
@@ -31,4 +31,4 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
             if metrics.Validity in m:
                 metric.append(cf_validity(cf, instance_cluster, centers))
             results[method["name"]].append(metric)
-    return results
+    return results, ["Similarity", "Minimality", "Plausibility", "Validity"]

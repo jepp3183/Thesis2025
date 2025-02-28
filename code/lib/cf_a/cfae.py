@@ -77,15 +77,14 @@ def Simple_CF_Ascent(
     cf = instance.copy()
 
     target_metric = centers[int(target)].copy()
+    if (center_mode == False):
+        target_metric = target_points.sample().values[0][:-1]
 
     it = 0
     changed_features = []
     while misses < stop_count and it < limit:
         y = target_points.sample().values[0][:-1]
         changes = []
-
-        if (center_mode == False):
-            target_metric = target_points.sample().values[0][:-1]
 
         current_dis = dis(cf, target_metric)
 

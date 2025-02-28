@@ -5,9 +5,10 @@ class metrics(Enum):
     Similarity = 0,
     Minimality = 1,
     Plausibility = 2,
-    Validity = 3
+    Validity = 3,
+    Diversity = 4
     
-def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity]):
+def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity]):
     results = {}
     for method in methods:
         results[method["name"]] = []
@@ -30,5 +31,8 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
                 metric.append(cf_plausibility(cf, target, X, y))
             if metrics.Validity in m:
                 metric.append(cf_validity(cf, instance_cluster, centers))
+            if metrics.Diversity in m:
+                div = cf_diversity(cf)
+                metric.append(div)
             results[method["name"]].append(metric)
-    return results, ["Similarity", "Minimality", "Plausibility", "Validity"]
+    return results, ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity"]

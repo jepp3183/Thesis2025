@@ -12,6 +12,7 @@ def baseline_explainer(X, cluster_labels, classifier, cf_method, initial_point, 
         X = X[(cluster_labels == init_cluster) | (cluster_labels == target_cluster)]
         cluster_labels = cluster_labels[(cluster_labels == init_cluster) | (cluster_labels == target_cluster)]
 
+    # dfX = pd.DataFrame(X, columns=[f'x{i}' for i in range(X.shape[1])])
     classifier.fit(X, cluster_labels)
     print(f"Done training classifier. Score: {classifier.score(X, cluster_labels)}")
 

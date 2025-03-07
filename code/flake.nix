@@ -54,6 +54,23 @@
                   sha256 = "sha256-IWWkAGGRKT8MHPrEyvIRJIsfQXJFaQEHymHJWlhfs2k=";
                   };
               };
+
+            alibi = 
+              pythonPackages.buildPythonPackage rec {
+                pname = "alibi";
+                version = "0.9.6";
+                doCheck = false;
+                src = pkgs.fetchPypi {
+                  inherit pname version;
+                  sha256 = "sha256-elB1uvYraTxEiXUigcWIFO/KHc0Iz+NTJC2pqdqe1sE=";
+                };
+                dependencies = [
+                  pythonPackages.spacy
+                  pythonPackages.transformers
+                  pythonPackages.dill
+                  pythonPackages.scikit-image
+                ];
+              };
         in
         {
           devShells.default = pkgs.mkShell {
@@ -68,8 +85,11 @@
                 scikit-learn
                 pandas
                 seaborn
+                tensorflow
+                keras
                 dice-ml
                 mmd-critic
+                # alibi
             ];
 
             shellHook = ''

@@ -73,10 +73,10 @@ While counterfactuals for classification is a well-studied area, there is less l
 
 #pagebreak()
 
-#include "ExplainableAI.typ"
-#include "k-means.typ"
-#include "methods.typ"
-#include "novel_methods.typ"
+#include "chapters/ExplainableAI.typ"
+#include "chapters/k-means.typ"
+#include "chapters/methods.typ"
+#include "chapters/novel_methods.typ"
 
 #pagebreak()
 #bibliography("bibliography.bib", style: "springer-vancouver")

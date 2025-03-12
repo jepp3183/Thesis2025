@@ -1,11 +1,11 @@
-#import "lib.typ": *
+#import "../lib.typ": *
 
 = Novel Methods
 == K-means counterfactuals
 One property of the k-means objective is that adding points to a dataset will inevitably change the clustering to some degree. This is not guarantied to change the clustering label of any points but at the very least the centers are malleable. This is because centers are calculated based on all the points in the cluster. Hence, moving a point to another cluster, as is the case with counterfactuals, would move the clustering boundary for both clusters involved. An example of a clustering boundary changing after a number of counterfactual changes can be seen on @fig:decisionBoundaryChange.
 
 #figure(
-  image("assets/DecisionBoundaryChangesCF.png"),
+  image("../assets/DecisionBoundaryChangesCF.png"),
   caption: [On each plot except the first, the arrow shows how a point was changed due to a counterfactual change, with the red ball being the resulting point. The background colors visualize the clustering boundary after the counterfactual change]
 )<fig:decisionBoundaryChange>
 
@@ -30,7 +30,7 @@ The only caveat to this observation is that the origin cluster center also moves
 $d(x,c_("target"))-d(c_"target",c_"origin")>0$ is true then the clustering boundary moves farther away from the target cluster center since it implies the point lies between the two clusters. If not true it is unclear whether the clustering boundary improves or not. This process is visualized by @fig:circlePlot. #todo(position: right)[TODO: I think it is possible to say something about the behavior in the "bad" case]
 
 #figure(
-  image("assets/circlePlot.png"),
+  image("../assets/circlePlot.png"),
   caption: [Both of the circles are abstract representations of clusters. If the point we want to explain lies in the red half-circle then the origin center would move away from the target center as a consequence of transforming the point into a counterfactual, hence why $d(x,c_("target"))-d(c_"target",c_"origin")>0$ implies the clustering boundary moves away from the target center. In the other case, when the point exists in the green half circle, the origin center would move towards the target center. In this case, the clustering boundary only moves closer to the origin center if the target center move further towards the counterfactual than the origin center does.]
 )<fig:circlePlot>
 

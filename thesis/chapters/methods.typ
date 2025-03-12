@@ -58,7 +58,7 @@ $
 To help with the counterfactual search, Baycon utilizes Bayesian Optimization. Bayesian Optimization is a useful tool when sampling or experimenting is expensive and you therefore want to be selective with the samples that you try out. It could e.g. be that for every experiment or sample you would have to make some kind of computation or prediction. On @fig:bayesian_optimization a regression problem is visualized, where we want to fit a function to the observed points. On this graph the greyed out areas represent the uncertainty in the model, as we do not have any points in these intervals to fit our model to. 
 
 #figure(
-  image("assets/bayesian optimization.png"),
+  image("../assets/bayesian optimization.png"),
   caption: [Bayesian optimization example]
 )<fig:bayesian_optimization>
 

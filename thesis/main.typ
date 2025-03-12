@@ -1,4 +1,6 @@
 // vim.lsp.get_clients()[1].request('workspace/executeCommand', { command = 'tinymist.pinMain', arguments = {vim.api.nvim_buf_get_name(0)} })
+#import "lib.typ": *
+#show: thm-rules
 
 #set heading(numbering: "1.1")
 #set math.equation(numbering: "(1)")
@@ -13,8 +15,6 @@
 #show raw: set text(font: "New Computer Modern Mono")
 #show heading: set block(above: 1.4em, below: 1em)
 // ------------------------------------------------------------
-
-// #include "ExplainableAI.typ"
 
 #outline(title: "Table of contents")
 #pagebreak()

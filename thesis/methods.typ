@@ -94,5 +94,5 @@ Semi supervised learning is a type of machine learning, which uses a small porti
 
 To find the actual counterfactual, now that we have defined our new soft scoring metrics, we can just follow the procedure as introduced in @sec:baycon.
 
-
+== CFClust
 

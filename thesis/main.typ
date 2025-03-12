@@ -34,6 +34,13 @@
 
 #pagebreak()
 
+#heading(numbering: none, "Project Description", outlined: false)
+This project aims to explore the field of explainable AI (XAI). Specifically, we will conduct an exploratory analysis of the current state-of-the-art methods for producing counterfactuals for centroid-based clustering algorithms. For supervised methods, the concept of a counterfactual is more clearly defined as a minimal change that would change the classification of a given point. For clustering, the concept is less intuitive due to the lack of a ground truth, but may be defined as a minimal change that would change the assigned cluster for a given point. Additionally, the clustering might change in response to a counterfactual, moving the cluster boundaries. This might impact validity and similarity of the counterfactual. We aim to also study this phenomenon.
+
+While counterfactuals for classification is a well-studied area, there is less literature available for clustering methods. We will conduct initial research by gathering existing literature. We will then conduct experiments and analyse existing methods. Furthermore, we aim to develop novel methods and evaluate them against existing methods.
+
+#pagebreak()
+
 #heading(numbering: none, "Abstract", outlined: false)
 #lorem(80)
 
@@ -41,11 +48,35 @@
 
 #outline(title: "Table of contents")
 
+#heading(numbering: none, outlined: false, "Preliminary TOC")
++ Introduction (3-5 pages)
++ Preliminaries (8-10 pages)
+  - XAI introduction
+  - K-means introduction
+  - Other centroid-based algorithms?
++ Related Work (\~15 pages)
+  - Supervised counterfactual methods
+  - Unsupervised counterfactual methods
++ Novel methods (15-20 pages)
+  - Accounting for cluster changes when transforming counterfactuals
+  - Our proposed methods (presentation, pseudocode, analysis etc.)
++ Experiments (5-8 pages)
+  - Datasets & preprocessing
+  - Evaluation metrics
+  - Baseline method
++ Results (5-8 pages)
+  - Presentation of results (tables, figures, digits examples)
++ Discussion (3-5 pages)
++ Conclusion (2-4 pages)
+ 
+ Total: 56-75 pages
+
 #pagebreak()
 
 #include "ExplainableAI.typ"
 #include "k-means.typ"
 #include "methods.typ"
+#include "novel_methods.typ"
 
 #pagebreak()
 #bibliography("bibliography.bib", style: "springer-vancouver")

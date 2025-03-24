@@ -172,7 +172,7 @@ class imm(object):
         
         result = prefix
         result += "├── " if is_left else "└── "
-        result += f"L{node.layer}: {node.feature} < {node.threshold}" if node.cluster is None else f"L{node.layer}, C: {node.cluster}"
+        result += f"L{node.layer}: f{node.feature} < {node.threshold}" if node.cluster is None else f"L{node.layer}, C: {node.cluster}"
         result += "\n"
         
         if node.left is not None or node.right is not None:

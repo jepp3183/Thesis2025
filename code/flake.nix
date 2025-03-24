@@ -87,6 +87,7 @@
                 seaborn
                 tensorflow
                 keras
+                torch
                 dice-ml
                 mmd-critic
                 # alibi

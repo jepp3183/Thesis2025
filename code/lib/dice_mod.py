@@ -5,11 +5,11 @@ def random_opt(start, gain, max_fails=50):
     fails = 0
     iter = 0
     history = [start[0]]
-    print(start)
+    # print(start)
     best = start
     best_gain = gain(start)
     while True:
-        step = np.random.normal(0, 1, start.shape)
+        step = np.random.normal(0, 0.1, start.shape)
         # print(step)
         cand = best + step
         cand_gain = gain(cand)
@@ -22,9 +22,9 @@ def random_opt(start, gain, max_fails=50):
         iter += 1
         if fails >= max_fails:
             break
-    print(f"best: {best}, best_gain: {best_gain}") 
-    print(f"hist shape: {np.array(history).shape}")
-    print(f"iter: {iter}")
+    # print(f"best: {best}, best_gain: {best_gain}") 
+    # print(f"hist shape: {np.array(history).shape}")
+    # print(f"iter: {iter}")
     return best, np.array(history)
     
 
@@ -64,10 +64,11 @@ class Gainer:
         self.loss_weights = {
             # self.ygain: 1,
             # self.sim_gain: 1,
+            self.dist_gain: 0.5,
             self.sigmoid_hinge_gain: 1,
             self.is_valid: 1,
             # self.sparsity_gain: 1,
-            self.gower_gain: 0.3,
+            # self.gower_gain: 1,
             # self.baycon_gain: 1
         }
 
@@ -82,13 +83,17 @@ class Gainer:
     
     def ygain(self, cf):
         d = np.linalg.norm(cf - self.C[[self.target]])
-        yloss = (d - self.min_t)/(self.max_t - self.min_t)
-        return np.clip(yloss, 0, 1)
+        y = (d - self.min_t)/(self.max_t - self.min_t)
+        return 1 - np.clip(y, 0, 1)
     
     def sim_gain(self, cf):
         d = np.linalg.norm(cf - self.x)
         d_sim = (d - self.min_t)/(self.max_t - self.min_t)
         return 1 - np.clip(d_sim, 0, 1)
+
+    def dist_gain(self, cf):
+        d = np.linalg.norm(cf - self.x)
+        return 1 - d
     
     # def is_closer(self, cf):
     #     """Returns true if the given cf is closer to target center than original center"""
@@ -109,15 +114,23 @@ class Gainer:
         valid = int((cf_cluster == self.target)[0])
         return max(valid, 0.1)
     
+    def sig(self, d):
+        off = self.max_t
+        # off = 0.5
+        base = 100000
+        e = base ** (d - off)
+        return 1 / (1 + e)
+        
+
     def sigmoid_hinge_gain(self, cf):
         d = np.linalg.norm(cf - self.C[[self.target]])
-        off = self.max_t
-        return 1 / (1 + np.exp(d - off))
+        return self.sig(d)
         
     def sparsity_gain(self, cf):
         return np.isclose(cf, self.x, atol=0.1).mean()
 
     def gower_gain(self, cf):
+        """invsere Gower's distance between the counterfactual and the original instance"""
         diffs = np.abs(cf - self.x)
         scaled_diffs = diffs / self.feature_ranges
         sims = 1 - scaled_diffs
@@ -127,6 +140,6 @@ class Gainer:
         return self.sim_gain(cf) * self.sparsity_gain(cf) * self.gower_gain(cf)
         
     def gain(self, cf):
-        l = sum([term(cf)*weight for term,weight in self.loss_weights.items()])
-        # l = math.prod([(term(cf)) for term in self.loss_weights.keys()])
+        # l = sum([term(cf)*weight for term,weight in self.loss_weights.items()])
+        l = math.prod([(term(cf)) for term in self.loss_weights.keys()])
         return l

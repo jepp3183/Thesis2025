@@ -31,7 +31,7 @@ def random_opt(start, gain, max_fails=25):
     return best, history
 
 
-def gradient_ascent(start, gain, lr = 0.05):
+def gradient_ascent(start, gain, lr = 0.001):
     start = torch.from_numpy(start)
     start.requires_grad = True
 
@@ -40,7 +40,7 @@ def gradient_ascent(start, gain, lr = 0.05):
     grad = torch.ones(start.shape)
     fails = 0
     history = start
-    while torch.linalg.norm(grad) > 0.01 or imp > 0:
+    while torch.linalg.norm(grad) > 0.15 or imp > 0.001:
         foo = gain(start)
         foo.backward()
         grad = start.grad
@@ -58,6 +58,7 @@ def gradient_ascent(start, gain, lr = 0.05):
         
         history = torch.vstack([history, start])
         iter += 1
+        print(f"iter: {iter}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {torch.array(history).shape}")
     print(f"iter: {iter}")
@@ -115,7 +116,7 @@ class Gainer:
         }
 
     def _classify(self, X):
-        dists = torch.linalg.norm(X[:, None] - self.C, axis=2)
+        dists = torch.linalg.norm(X[:, None] - self.C, dim=2)
         return torch.argmin(dists, 1) 
 
     def _find_cluster_distances(self):
@@ -166,7 +167,9 @@ class Gainer:
             cf = torch.from_numpy(cf)
 
 
-        centers = self.C[self.C != self.C[self.target]].reshape(self.C.shape[0] - 1, self.C.shape[1])
+        mask = torch.arange(self.C.size(0)) != self.target
+        baz = self.C[mask]
+        centers = baz.reshape(self.C.shape[0] - 1, self.C.shape[1])
 
 
         dists = torch.linalg.norm(cf - centers, dim = 1)

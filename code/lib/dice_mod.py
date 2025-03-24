@@ -1,31 +1,68 @@
 import numpy as np
+import torch
 import math
 
+
 def random_opt(start, gain, max_fails=25):
+    start = torch.from_numpy(start)
     fails = 0
     iter = 0
-    history = start.copy()
+    history = start
     # print(start)
     best = start
     best_gain = gain(start)
     while True:
-        step = np.random.normal(0, 0.1, start.shape)
+        step = torch.normal(0, 0.1, start.shape)
         # print(step)
         cand = best + step
         cand_gain = gain(cand)
         if cand_gain > best_gain:
             best = cand
             best_gain = cand_gain
-            history = np.vstack([history, best])
+            history = torch.vstack([history, best])
         else: 
             fails += 1
         iter += 1
         if fails >= max_fails:
             break
     # print(f"best: {best}, best_gain: {best_gain}") 
-    # print(f"hist shape: {np.array(history).shape}")
+    # print(f"hist shape: {torch.array(history).shape}")
     print(f"iter: {iter}")
-    return best, np.array(history)
+    return best, history
+
+
+def gradient_ascent(start, gain, lr = 0.05):
+    start = torch.from_numpy(start)
+    start.requires_grad = True
+
+    iter = 0
+    imp = float("inf")
+    grad = torch.ones(start.shape)
+    fails = 0
+    history = start
+    while torch.linalg.norm(grad) > 0.01 or imp > 0:
+        foo = gain(start)
+        foo.backward()
+        grad = start.grad
+
+        with torch.no_grad():
+            prev = gain(start)
+            start = start + lr * grad
+            imp = gain(start) - prev
+            if imp < 0:
+                fails += 1
+            else:
+                fails = 0
+            
+        start.requires_grad = True
+        
+        history = torch.vstack([history, start])
+        iter += 1
+    # print(f"best: {best}, best_gain: {best_gain}") 
+    # print(f"hist shape: {torch.array(history).shape}")
+    print(f"iter: {iter}")
+    return start.detach().numpy(), history.detach().numpy()
+    
     
 
 class Gainer:
@@ -41,27 +78,31 @@ class Gainer:
 
         x: instance to be explained
         """
-        self.C = C
-        self.X = X
-        self.target = target
-        self.x = x
+        print(f"X: {X.shape}")
+        print(f"C: {C.shape}")
+        print(f"x: {x.shape}")
 
-        self.instance_cluster = self._classify(x)[0]
+        self.C = torch.from_numpy(C)
+        self.X = torch.from_numpy(X)
+        self.target = target
+        self.x = torch.from_numpy(x)
+
+        self.instance_cluster = self._classify(self.x)[0]
         assert self.instance_cluster != self.target
 
-        self.y = self._classify(X)
-        self.x_idx = np.where(np.all(X == x, axis=1))[0][0]
+        self.y = self._classify(self.X)
+        self.x_idx = torch.where(torch.all(self.X == self.x, 1))[0][0]
 
         self.max_t, self.min_t = self._find_cluster_distances()
-        self.mean_t = np.mean(
-            np.linalg.norm(self.X[self.y==self.target] - self.C[[self.target]], axis=1)
+        self.mean_t = torch.mean(
+            torch.linalg.norm(self.X[self.y==self.target] - self.C[[self.target]], axis=1)
         )
 
-        feature_mins = X.min(axis=0)
-        feature_maxs = X.max(axis=0)
+        feature_mins = self.X.min(0).values
+        feature_maxs = self.X.max(0).values
         self.feature_ranges = feature_maxs - feature_mins
 
-        self.loss_weights = {
+        self.gain_weights = {
             # self.ygain: 1,
             # self.sim_gain: 1,
             self.dist_gain: 0.5,
@@ -70,50 +111,75 @@ class Gainer:
             # self.sparsity_gain: 1,
             # self.gower_gain: 1,
             # self.baycon_gain: 1
+            self.smooth_is_valid: 1
         }
 
     def _classify(self, X):
-        dists = np.linalg.norm(X[:, None] - self.C, axis=2)
-        return np.argmin(dists, axis=1) 
+        dists = torch.linalg.norm(X[:, None] - self.C, axis=2)
+        return torch.argmin(dists, 1) 
 
     def _find_cluster_distances(self):
         c = self.C[[self.target]]
-        dists = np.linalg.norm(self.X[self.y==self.target] - c, axis=1)
-        return np.max(dists), np.min(dists)
+        dists = torch.linalg.norm(self.X[self.y==self.target] - c, axis=1)
+        return torch.max(dists), torch.min(dists)
     
     def ygain(self, cf):
-        d = np.linalg.norm(cf - self.C[[self.target]])
+        d = torch.linalg.norm(cf - self.C[[self.target]])
         y = (d - self.min_t)/(self.max_t - self.min_t)
-        return 1 - np.clip(y, 0, 1)
+        return 1 - torch.clip(y, 0, 1)
     
     def sim_gain(self, cf):
-        d = np.linalg.norm(cf - self.x)
+        d = torch.linalg.norm(cf - self.x)
         d_sim = (d - self.min_t)/(self.max_t - self.min_t)
-        return 1 - np.clip(d_sim, 0, 1)
+        return 1 - torch.clip(d_sim, 0, 1)
 
     def dist_gain(self, cf):
-        d = np.linalg.norm(cf - self.x)
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+        d = torch.linalg.norm(cf - self.x)
         return 1 - d
     
     # def is_closer(self, cf):
     #     """Returns true if the given cf is closer to target center than original center"""
-    #     return np.linalg.norm(cf - self.C[[self.instance_cluster]]) > np.linalg.norm(cf - self.C[[self.target]])
+    #     return torch.linalg.norm(cf - self.C[[self.instance_cluster]]) > torch.linalg.norm(cf - self.C[[self.target]])
     
     # def binary_hinge_loss(self, cf):
     #     return int(not self.is_closer(cf))
     
     # def hinge_similarity_loss(self, cf):
-    #     halfway = np.mean([self.C[[self.target]], self.C[[self.instance_cluster]]], axis=0)
-    #     d = np.linalg.norm(cf - halfway)
-    #     d_sim = d / np.linalg.norm(self.C[[self.target]] - halfway[:, None])
+    #     halfway = torch.mean([self.C[[self.target]], self.C[[self.instance_cluster]]], axis=0)
+    #     d = torch.linalg.norm(cf - halfway)
+    #     d_sim = d / torch.linalg.norm(self.C[[self.target]] - halfway[:, None])
 
     #     return int(not self.is_closer(cf)) + d_sim - 1
 
     def is_valid(self, cf):
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
         cf_cluster = self._classify(cf)
-        valid = int((cf_cluster == self.target)[0])
-        return max(valid, 0.1)
-    
+        valid = (cf_cluster == self.target)
+        ret = torch.maximum(valid, torch.tensor(0.5))
+        return ret[0]
+
+    def smooth_is_valid(self, cf):
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+
+
+        centers = self.C[self.C != self.C[self.target]].reshape(self.C.shape[0] - 1, self.C.shape[1])
+
+
+        dists = torch.linalg.norm(cf - centers, dim = 1)
+
+        min_dist = torch.min(dists)
+        t_dist = torch.linalg.norm(cf - self.C[[self.target]])
+        
+        # return min_dist / (t_dist + min_dist)
+        foo = (min_dist + t_dist) / (2 * t_dist)
+        # print everything above
+        bar = torch.minimum(torch.tensor(1), foo)
+        return bar
+
     def sig(self, d):
         off = self.max_t
         # off = 0.5
@@ -123,23 +189,32 @@ class Gainer:
         
 
     def sigmoid_hinge_gain(self, cf):
-        d = np.linalg.norm(cf - self.C[[self.target]])
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+        d = torch.linalg.norm(cf - self.C[[self.target]])
         return self.sig(d)
         
     def sparsity_gain(self, cf):
-        return np.isclose(cf, self.x, atol=0.1).mean()
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+
+        i = torch.isclose(cf, self.x, atol=0.01).mean(dtype=torch.float64)
+        return torch.maximum(torch.tensor(0.1 / cf.shape[1]), i)
 
     def gower_gain(self, cf):
         """invsere Gower's distance between the counterfactual and the original instance"""
-        diffs = np.abs(cf - self.x)
+        diffs = torch.abs(cf - self.x)
         scaled_diffs = diffs / self.feature_ranges
         sims = 1 - scaled_diffs
-        return np.mean(sims)
+        return torch.mean(sims)
     
     def baycon_gain(self, cf):
         return self.sim_gain(cf) * self.sparsity_gain(cf) * self.gower_gain(cf)
         
     def gain(self, cf):
-        # l = sum([term(cf)*weight for term,weight in self.loss_weights.items()])
-        l = math.prod([(term(cf)) for term in self.loss_weights.keys()])
-        return l
+        # gain = sum([term(cf)*weight for term,weight in self.gain_weights.items()])
+        # gain = math.prod([(term(cf)) for term in self.gain_weights.keys()])
+        gain = torch.tensor(1, dtype=torch.float64)
+        for term in self.gain_weights.keys():
+            gain *= term(cf)
+        return gain

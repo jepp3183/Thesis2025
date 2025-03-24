@@ -1,10 +1,10 @@
 import numpy as np
 import math
 
-def random_opt(start, gain, max_fails=50):
+def random_opt(start, gain, max_fails=25):
     fails = 0
     iter = 0
-    history = [start[0]]
+    history = start.copy()
     # print(start)
     best = start
     best_gain = gain(start)
@@ -16,7 +16,7 @@ def random_opt(start, gain, max_fails=50):
         if cand_gain > best_gain:
             best = cand
             best_gain = cand_gain
-            history.append(best[0])
+            history = np.vstack([history, best])
         else: 
             fails += 1
         iter += 1
@@ -24,7 +24,7 @@ def random_opt(start, gain, max_fails=50):
             break
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {np.array(history).shape}")
-    # print(f"iter: {iter}")
+    print(f"iter: {iter}")
     return best, np.array(history)
     
 
@@ -66,7 +66,7 @@ class Gainer:
             # self.sim_gain: 1,
             self.dist_gain: 0.5,
             self.sigmoid_hinge_gain: 1,
-            self.is_valid: 1,
+            # self.is_valid: 1,
             # self.sparsity_gain: 1,
             # self.gower_gain: 1,
             # self.baycon_gain: 1

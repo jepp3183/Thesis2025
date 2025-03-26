@@ -72,7 +72,7 @@ def neighborSearchMarginal(
                 temp_cf[f] = neighbor[f]
 
                 def marginalGain(point, past_point, t, o, x):
-                    gain = cScore(point,t,o) * (dis(instance, neighbor) - dis(neighbor,point)) - cScore(past_point,t, o) * (dis(instance, neighbor) - dis(neighbor,past_point))
+                    gain = cScore(point,t,o) * (dis(x, neighbor) - dis(neighbor,point)) - cScore(past_point,t, o) * (dis(x, neighbor) - dis(neighbor,past_point))
                     assert gain >= 0
                     return gain
 

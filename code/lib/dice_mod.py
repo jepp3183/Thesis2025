@@ -31,7 +31,7 @@ def random_opt(start, gain, max_fails=25):
     return best, history
 
 
-def gradient_ascent(start, gain, lr = 0.001):
+def gradient_ascent(start, gain, lr = 0.1):
     start = torch.from_numpy(start)
     start.requires_grad = True
 
@@ -40,15 +40,16 @@ def gradient_ascent(start, gain, lr = 0.001):
     grad = torch.ones(start.shape)
     fails = 0
     history = start
-    while torch.linalg.norm(grad) > 0.15 or imp > 0.001:
+    while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
         foo = gain(start)
         foo.backward()
         grad = start.grad
 
         with torch.no_grad():
             prev = gain(start)
-            start = start + lr * grad
-            imp = gain(start) - prev
+            start = start + (lr / (1 + 0.01 * iter)) * grad
+            score = gain(start)
+            imp = score - prev
             if imp < 0:
                 fails += 1
             else:
@@ -58,7 +59,7 @@ def gradient_ascent(start, gain, lr = 0.001):
         
         history = torch.vstack([history, start])
         iter += 1
-        print(f"iter: {iter}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
+        print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {torch.array(history).shape}")
     print(f"iter: {iter}")
@@ -67,7 +68,7 @@ def gradient_ascent(start, gain, lr = 0.001):
     
 
 class Gainer:
-    def __init__(self, C, X, target, x):
+    def __init__(self, C, X, target, x, **kwargs):
         """
         Parameters
         ----------
@@ -82,6 +83,8 @@ class Gainer:
         print(f"X: {X.shape}")
         print(f"C: {C.shape}")
         print(f"x: {x.shape}")
+
+        self.eps = kwargs.get("eps", 0)
 
         self.C = torch.from_numpy(C)
         self.X = torch.from_numpy(X)
@@ -184,7 +187,7 @@ class Gainer:
         return bar
 
     def sig(self, d):
-        off = self.max_t
+        off = (1 - self.eps) * self.max_t
         # off = 0.5
         base = 100000
         e = base ** (d - off)

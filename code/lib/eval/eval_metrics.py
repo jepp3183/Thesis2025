@@ -8,10 +8,18 @@ def cf_similarity(cf, instance, dis = euclid_dis) -> float:
     assert len(cf.shape) == 2
     return np.array([dis(instance, cf_i) for cf_i in cf])
 
-def cf_validity(cf, instance_cluster, centers, eval = center_prediction) -> float:
+def cf_validity(cf, target_cluster, centers, eval = center_prediction) -> float:
     assert len(cf.shape) == 2
 
-    return float(instance_cluster) != eval(cf, centers)
+    dists = np.linalg.norm(cf[:, None] - centers, axis=2)
+    print(f"dists shape: {dists.shape}")
+    pred = np.argmin(dists, axis = 1) 
+    print(f"pred shape: {pred.shape}")
+    print(f"pred: {pred}")
+
+    r = pred == int(target_cluster)
+    print(f"r shape: {r.shape}")
+    return r
 
 def cf_plausibility(cf, target, X, y) -> float:
     assert len(cf.shape) == 2

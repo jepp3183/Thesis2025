@@ -23,6 +23,10 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
             target = cf_data.target
             instance_cluster = cf_data.instance_label
 
+            if len(cf) == 0:
+                results[method["name"]].append([[] for _ in range(len(m))])
+                continue
+
             if metrics.Similarity in m:
                 metric.append(cf_similarity(cf, instance))
             if metrics.Minimality in m:
@@ -30,7 +34,7 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
             if metrics.Plausibility in m:
                 metric.append(cf_plausibility(cf, target, X, y))
             if metrics.Validity in m:
-                metric.append(cf_validity(cf, instance_cluster, centers))
+                metric.append(cf_validity(cf, target, centers))
             if metrics.Diversity in m:
                 div = cf_diversity(cf)
                 metric.append(div)

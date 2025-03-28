@@ -55,22 +55,21 @@
                   };
               };
 
-            alibi = 
+            umap-learn = 
               pythonPackages.buildPythonPackage rec {
-                pname = "alibi";
-                version = "0.9.6";
+                pname = "umap-learn";
+                version = "0.5.7";
                 doCheck = false;
                 src = pkgs.fetchPypi {
                   inherit pname version;
-                  sha256 = "sha256-elB1uvYraTxEiXUigcWIFO/KHc0Iz+NTJC2pqdqe1sE=";
+                  sha256 = "sha256-sql5c+TG/86/JBEAqN5YmkyEEmqDKrQPKWxtn8xesZ4=";
                 };
                 dependencies = [
-                  pythonPackages.spacy
-                  pythonPackages.transformers
-                  pythonPackages.dill
-                  pythonPackages.scikit-image
+                  pythonPackages.numba
+                  pythonPackages.pynndescent
                 ];
               };
+
         in
         {
           devShells.default = pkgs.mkShell {
@@ -88,8 +87,10 @@
                 tensorflow
                 keras
                 torch
+                debugpy
                 dice-ml
                 mmd-critic
+                umap-learn
                 # alibi
             ];
 

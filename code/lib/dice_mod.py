@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import math
 
 
 def random_opt(start, gain, max_fails=25):
@@ -31,39 +30,47 @@ def random_opt(start, gain, max_fails=25):
     return best, history
 
 
-def gradient_ascent(start, gain, lr = 0.1):
-    start = torch.from_numpy(start)
-    start.requires_grad = True
+def gradient_ascent(start: np.ndarray, gain, lr = 0.1):
+    current = torch.from_numpy(start)
+    current.requires_grad = True
 
     iter = 0
     imp = float("inf")
-    grad = torch.ones(start.shape)
+    grad = torch.ones(current.shape)
     fails = 0
-    history = start
-    while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
-        foo = gain(start)
+    best = current
+    best_score = 0
+    history = current
+    # while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
+    while iter < 5000 and fails < 100:
+        foo = gain(current)
         foo.backward()
-        grad = start.grad
+        grad = current.grad
+        if grad is None:
+            print("grad is None")
+            break
 
         with torch.no_grad():
-            prev = gain(start)
-            start = start + (lr / (1 + 0.01 * iter)) * grad
-            score = gain(start)
-            imp = score - prev
-            if imp < 0:
-                fails += 1
-            else:
+            prev = gain(current)
+            current = current + (lr / (1 + 0.01 * iter)) * grad
+            score = gain(current)
+            if score > best_score:
+                best = current
+                best_score = score
                 fails = 0
+            else:
+                fails += 1
+            imp = score - prev
             
-        start.requires_grad = True
+        current.requires_grad = True
         
-        history = torch.vstack([history, start])
+        history = torch.vstack([history, current])
         iter += 1
         print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {torch.array(history).shape}")
     print(f"iter: {iter}")
-    return start.detach().numpy(), history.detach().numpy()
+    return best.detach().numpy(), history.detach().numpy()
     
     
 

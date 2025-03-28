@@ -121,15 +121,15 @@ def Simple_CF_Ascent(
                 try:
                     prediction = predictor(best)
                     if prediction == target:
+                        print("gaming")
+                        cf = best
                         break
-                    elif prediction == pred_instance:
+                    else:
                         cf = best
                         misses = 0
                         history.append(best)
                         if f not in changed_features:
                             changed_features.append(f)
-                    else:
-                        misses += 1
                 except ValueError:
                     misses += 1
         it += 1

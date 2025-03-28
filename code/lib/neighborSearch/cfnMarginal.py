@@ -73,8 +73,7 @@ def neighborSearchMarginal(
 
                 def marginalGain(point, past_point, t, o, x):
                     gain = cScore(point,t,o) * (dis(x, neighbor) - dis(neighbor,point)) - cScore(past_point,t, o) * (dis(x, neighbor) - dis(neighbor,past_point))
-                    assert gain >= 0
-                    return gain
+                    return max(gain,0)
 
                 score = marginalGain(temp_cf, cf, center_target, center_orgin, instance)
                 

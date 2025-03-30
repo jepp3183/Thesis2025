@@ -9,13 +9,11 @@ class metrics(Enum):
     Diversity = 4
     
 def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity]):
-    results = {}
-    for method in methods:
-        results[method["name"]] = []
+    results = {method["name"]: [] for method in methods}
 
     for method in methods:
         cfs_data = method["counterfactuals"]
-        
+        method_name = method["name"]
         for cf_data in cfs_data:
             metric = []
             cf = np.array(cf_data.cf)
@@ -24,7 +22,7 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
             instance_cluster = cf_data.instance_label
 
             if len(cf) == 0:
-                results[method["name"]].append([[] for _ in range(len(m))])
+                results[method_name].append([[] for _ in range(len(m))])
                 continue
 
             if metrics.Similarity in m:
@@ -38,5 +36,6 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
             if metrics.Diversity in m:
                 div = cf_diversity(cf)
                 metric.append(div)
-            results[method["name"]].append(metric)
+
+            results[method_name].append(metric)
     return results, ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity"]

@@ -12,13 +12,13 @@ def cf_validity(cf, target_cluster, centers, eval = center_prediction) -> float:
     assert len(cf.shape) == 2
 
     dists = np.linalg.norm(cf[:, None] - centers, axis=2)
-    print(f"dists shape: {dists.shape}")
+    # print(f"dists shape: {dists.shape}")
     pred = np.argmin(dists, axis = 1) 
-    print(f"pred shape: {pred.shape}")
-    print(f"pred: {pred}")
+    # print(f"pred shape: {pred.shape}")
+    # print(f"pred: {pred}")
 
     r = pred == int(target_cluster)
-    print(f"r shape: {r.shape}")
+    # print(f"r shape: {r.shape}")
     return r
 
 def cf_plausibility(cf, target, X, y) -> float:

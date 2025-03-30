@@ -71,7 +71,7 @@ def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False):
             print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {torch.array(history).shape}")
-    print(f"iter: {iter}")
+    print(f"iter: {iter}, score: {best_score}")
     return best.detach().numpy(), history.detach().numpy()
     
     

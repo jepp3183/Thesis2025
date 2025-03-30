@@ -30,29 +30,30 @@ def random_opt(start, gain, max_fails=25):
     return best, history
 
 
-def gradient_ascent(start: np.ndarray, gain, lr = 0.1):
+def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False):
     current = torch.from_numpy(start)
     current.requires_grad = True
 
-    iter = 0
+    iter = 1
     imp = float("inf")
-    grad = torch.ones(current.shape)
     fails = 0
     best = current
     best_score = 0
     history = current
     # while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
-    while iter < 5000 and fails < 100:
+    while iter < 1000 and fails < 100:
         foo = gain(current)
         foo.backward()
         grad = current.grad
         if grad is None:
             print("grad is None")
             break
+        grad[grad.isnan()] = 0
 
         with torch.no_grad():
             prev = gain(current)
-            current = current + (lr / (1 + 0.01 * iter)) * grad
+            damp = iter // 100 + 1
+            current = current + (lr / damp) * grad
             score = gain(current)
             if score > best_score:
                 best = current
@@ -66,7 +67,8 @@ def gradient_ascent(start: np.ndarray, gain, lr = 0.1):
         
         history = torch.vstack([history, current])
         iter += 1
-        print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
+        if dbg:
+            print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
     # print(f"best: {best}, best_gain: {best_gain}") 
     # print(f"hist shape: {torch.array(history).shape}")
     print(f"iter: {iter}")
@@ -116,11 +118,11 @@ class Gainer:
         self.gain_weights = {
             # self.ygain: 1,
             # self.sim_gain: 1,
-            self.dist_gain: 0.5,
+            # self.dist_gain: 0.5,
             self.sigmoid_hinge_gain: 1,
             # self.is_valid: 1,
             # self.sparsity_gain: 1,
-            # self.gower_gain: 1,
+            self.gower_gain: 1,
             # self.baycon_gain: 1
             self.smooth_is_valid: 1
         }
@@ -196,9 +198,9 @@ class Gainer:
     def sig(self, d):
         off = (1 - self.eps) * self.max_t
         # off = 0.5
-        base = 100000
+        base = 10000
         e = base ** (d - off)
-        return 1 / (1 + e)
+        return (1 / (1 + e))
         
 
     def sigmoid_hinge_gain(self, cf):
@@ -215,11 +217,18 @@ class Gainer:
         return torch.maximum(torch.tensor(0.1 / cf.shape[1]), i)
 
     def gower_gain(self, cf):
-        """invsere Gower's distance between the counterfactual and the original instance"""
+        """
+        Inverse Gower's distance between the counterfactual and the original instance.
+        WARNING: CAUSES NaNs in gradient!
+        """
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
         diffs = torch.abs(cf - self.x)
         scaled_diffs = diffs / self.feature_ranges
+        scaled_diffs[scaled_diffs != scaled_diffs] = 0
         sims = 1 - scaled_diffs
-        return torch.mean(sims)
+        res = torch.mean(sims)
+        return res
     
     def baycon_gain(self, cf):
         return self.sim_gain(cf) * self.sparsity_gain(cf) * self.gower_gain(cf)

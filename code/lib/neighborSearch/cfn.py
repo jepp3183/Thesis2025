@@ -11,6 +11,7 @@ import pandas as pd
 import random
 from sklearn.neighbors import NearestNeighbors
 
+# This is deprecated - look at cfnMarginal for newer implementation
 def neighborSearch(
         X,
         y,

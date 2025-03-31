@@ -2,31 +2,50 @@ import numpy as np
 import random
 import pandas as pd
 
+# Counterfactual ascent takes the following parameters:
+#   X                   - data points
+#   y                   - labels for data points
+#   target              - taarget cluster
+#   centers             - centers for clusters
+#   model               - the clustering model, if not set euclidian distance is used instead
+#   instance_index      - instance for which counterfactuals are generated, is randomly set (for testing purposes) if not given
+#   stop_count          - after this many iterations without improvements stop, too low could result in non-valid counterfactuals
+#   step_size           - how much each feature is changed in each iteration, too slow does not converge but too fast given solution with low similarity
+#   limit               - the maximum amount of iterations allowed
+#   feature_penalty     - punishes the algorithm from changing too many features, very sensitive to small changes
+#   dis                 - distance metric
+#   immutable_features  - list of which features are immutable as indexes, f.eks. [2,8,11] for feature 2,8,11
+#   center_mode         - decides whether the ascent target is a random point in target cluster or the center, 
+#                         random points in general work better hence why it's false by default
+#
+#
+# Returns the instance, the resulting counterfactual and the history of changes
+#
 def CF_Ascent(
         X,
         y, 
         target, 
         centers, 
         model=None, 
-        instance_index=-1, 
+        instance_index=None, 
         stop_count=100, 
         step_size=0.05, 
         limit = 10000,
         feature_penalty = 1.001, 
         dis = lambda a,b : euclid_dis(a,b),
         immutable_features = [],
-        center_mode = True):
+        center_mode = False):
     
     df = pd.DataFrame(np.column_stack((X, y)), columns=[f'x{i}' for i in range(X.shape[1])] + ['label'], dtype=float)
     return Simple_CF_Ascent(df, target, centers, model, instance_index, stop_count, step_size, limit, feature_penalty, dis, immutable_features, center_mode)
 
-
+# This constructor exists for test purposes, refer to above constructor for use outside this sub-directory
 def Simple_CF_Ascent(
         df,
         target, 
         centers, 
         model=None, 
-        instance_index=-1, 
+        instance_index=None, 
         stop_count=100, 
         step_size=0.05, 
         limit = 10000,
@@ -36,7 +55,7 @@ def Simple_CF_Ascent(
         center_mode = True):
 
     predictor = None
-    if model == None:
+    if model == None: # If model has not been provided use euclidian distance
         def center_prediction(p):
             current_best_center = 0
             current_best_distance = float("inf")
@@ -53,37 +72,34 @@ def Simple_CF_Ascent(
 
     target_points = df[df["label"] == target]
 
-    pred_instance = 0.0
-    if instance_index == -1:
+    if instance_index == None: # Only for testing, pick random point and target
         while True:
             index = random.randint(0,len(df.values))
             new_instance = df.values[index][:-1]
             pred = predictor(new_instance)
-            pred_instance = pred
             if pred != target:
                 instance_index = index
                 break
     else:
         new_instance = df.values[instance_index][:-1]
         pred = predictor(new_instance)
-        pred_instance = pred
         if pred == target:
             raise Exception("Faulty instance were given, target does not match")
 
     history = []
     misses = 0
-    instance = df.values[instance_index][:-1]
+    instance = np.array(df.values[instance_index][:-1])
 
-    cf = instance.copy()
+    cf = np.array(instance.copy())
 
-    target_metric = centers[int(target)].copy()
-    if (center_mode == False):
-        target_metric = target_points.sample().values[0][:-1]
+    target_metric = np.array(centers[int(target)].copy())
+    if (center_mode == False): # is false by default
+        target_metric = np.array(target_points.sample().values[0][:-1])
 
     it = 0
     changed_features = []
     while misses < stop_count and it < limit:
-        y = target_points.sample().values[0][:-1]
+        y = np.array(target_points.sample().values[0][:-1])
         changes = []
 
         current_dis = dis(cf, target_metric)
@@ -121,7 +137,6 @@ def Simple_CF_Ascent(
                 try:
                     prediction = predictor(best)
                     if prediction == target:
-                        print("gaming")
                         cf = best
                         break
                     else:
@@ -137,7 +152,7 @@ def Simple_CF_Ascent(
     if len(history) == 0:
         history.append(cf)
         
-    return instance,cf,history
+    return instance,cf,np.array(history)
 
 def euclid_dis(x,y):
     return np.linalg.norm(x-y)

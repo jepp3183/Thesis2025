@@ -292,7 +292,7 @@ class ThresholdTree():
         # print("Counterfactual class: ", imm_model.predict(cf))
         self._IMM_instance = instance
         self._IMM_cf = cf
-        return cf
+        return np.array([cf])
 
     def print_IMM_tree(self):
         """

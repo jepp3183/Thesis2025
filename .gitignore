@@ -173,3 +173,4 @@ thesis/*.pdf
 .aider*
 threshold
 .vscode
+code/datasets/diabetes.csv

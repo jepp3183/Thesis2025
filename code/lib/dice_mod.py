@@ -1,5 +1,8 @@
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA
 
 
 def random_opt(start, gain, max_fails=25):
@@ -7,12 +10,10 @@ def random_opt(start, gain, max_fails=25):
     fails = 0
     iter = 0
     history = start
-    # print(start)
     best = start
     best_gain = gain(start)
     while True:
         step = torch.normal(0, 0.1, start.shape)
-        # print(step)
         cand = best + step
         cand_gain = gain(cand)
         if cand_gain > best_gain:
@@ -24,26 +25,24 @@ def random_opt(start, gain, max_fails=25):
         iter += 1
         if fails >= max_fails:
             break
-    # print(f"best: {best}, best_gain: {best_gain}") 
-    # print(f"hist shape: {torch.array(history).shape}")
-    print(f"iter: {iter}")
+    print(f"iter: {iter}, score: {best_gain}")
     return best, history
 
 
-def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False, max_iter=1000):
+def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
     current = torch.from_numpy(start)
     current.requires_grad = True
 
-    iter = 1
-    imp = float("inf")
+    iter_count = 1
     fails = 0
     best = current
     best_score = 0
     history = current
-    # while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
-    while iter < max_iter and fails < 100:
-        foo = gain(current)
-        foo.backward()
+    
+    while iter_count < max_iter and fails < 100:
+        # Compute gradient
+        score = gain(current)
+        score.backward()
         grad = current.grad
         if grad is None:
             print("grad is None")
@@ -51,27 +50,36 @@ def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False, max_iter=1000)
         grad[grad.isnan()] = 0
 
         with torch.no_grad():
-            prev = gain(current)
-            damp = iter // 100 + 1
+            prev_score = gain(current)
+            
+            # Update current point
+            damp = iter_count // 100 + 1
             current = current + (lr / damp) * grad
-            score = gain(current)
-            if score > best_score:
+            
+            # Evaluate new point
+            new_score = gain(current)
+            improvement = new_score - prev_score
+            
+            # Track best solution
+            if new_score > best_score:
                 best = current
-                best_score = score
+                best_score = new_score
                 fails = 0
             else:
                 fails += 1
-            imp = score - prev
             
+        # Reset gradient for next iteration
         current.requires_grad = True
         
+        # Record history
         history = torch.vstack([history, current])
-        iter += 1
+        
         if dbg:
-            print(f"iter: {iter}, score: {score}, imp: {imp}, grad: {torch.linalg.norm(grad)}")
-    # print(f"best: {best}, best_gain: {best_gain}") 
-    # print(f"hist shape: {torch.array(history).shape}")
-    print(f"iter: {iter}, score: {best_score}")
+            print(f"iter: {iter_count}, score: {new_score}, imp: {improvement}, grad: {torch.linalg.norm(grad)}")
+            
+        iter_count += 1
+        
+    print(f"iter: {iter_count}, score: {best_score}")
     return best.detach().numpy(), history.detach().numpy()
     
     
@@ -88,6 +96,9 @@ class Gainer:
         target: target cluster label
 
         x: instance to be explained
+
+        kwargs:
+            eps [0-1], default: 0. Controls how close the solution will be to the target cluster center.
         """
         print(f"X: {X.shape}")
         print(f"C: {C.shape}")
@@ -101,7 +112,7 @@ class Gainer:
         self.x = torch.from_numpy(x)
 
         self.instance_cluster = self._classify(self.x)[0]
-        assert self.instance_cluster != self.target
+        assert self.instance_cluster != self.target, "Instance is already in target cluster"
 
         self.y = self._classify(self.X)
         self.x_idx = torch.where(torch.all(self.X == self.x, 1))[0][0]
@@ -116,15 +127,15 @@ class Gainer:
         self.feature_ranges = feature_maxs - feature_mins
 
         self.gain_weights = {
-            # self.ygain: 1,
-            # self.sim_gain: 1,
-            # self.dist_gain: 0.5,
-            self.sigmoid_hinge_gain: 1,
-            # self.is_valid: 1,
-            # self.sparsity_gain: 1,
             self.gower_gain: 1,
-            # self.baycon_gain: 1
-            self.smooth_is_valid: 1
+            self.sigmoid_hinge_gain: 1,
+            self.smooth_is_valid: 1,
+            # self.baycon_gain: 1,
+            # self.dist_gain: 0.5,
+            # self.is_valid: 1,
+            # self.sim_gain: 1,
+            # self.sparsity_gain: 1,
+            # self.ygain: 1
         }
 
     def _classify(self, X):
@@ -228,3 +239,48 @@ class Gainer:
             # print(f"{term.__name__}: {t}")
             gain *= t
         return gain
+
+
+def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solutions=None, histories=None, ax=None):
+    if use_pca:
+        pca = PCA(n_components=2)
+        X = pca.fit_transform(X)
+        C = pca.transform(C)
+        random_point = pca.transform(random_point)
+        if solutions is not None:
+            solutions = [pca.transform(solution) for solution in solutions]
+        if histories is not None:
+            histories = [pca.transform(history) for history in histories]
+    
+    p = plt if ax is None else ax
+
+
+    # Create a grid for the heatmap
+    if not use_pca:
+        x_min, x_max = X[:, 0].min(), X[:, 0].max()
+        y_min, y_max = X[:, 1].min(), X[:, 1].max()
+        xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100),
+                            np.linspace(y_min, y_max, 100))
+        grid_points = np.c_[xx.ravel(), yy.ravel()]
+        values = np.array([fn(point.reshape(1, -1)) for point in grid_points])
+        grid = values.reshape(xx.shape)
+        p.contourf(xx, yy, grid, levels=50, cmap='viridis', alpha=0.5)
+
+    # Plot data points, cluster centers, and random point
+    unique_labels = np.unique(y)
+    palette = sns.color_palette("husl", len(unique_labels))  # Use a distinct color palette
+
+    sns.scatterplot(x=X[:, 0], y=X[:, 1], hue=y, palette=palette, ax=ax)
+    sns.scatterplot(x=C[:, 0], y=C[:, 1], color='red', s=100, marker='o', ax=ax)
+    sns.scatterplot(x=random_point[:, 0], y=random_point[:, 1], color='green', s=100, marker='o', ax=ax)
+    if histories is not None:
+        for h in histories:
+            p.plot(h[:, 0], h[:, 1], color='black', linewidth=1, linestyle='dashed', markersize=2)
+    if solutions is not None:
+        for s in solutions:
+            sns.scatterplot(x=s[:, 0], y=s[:, 1], color='purple', s=100, marker='o', ax=ax)
+
+    plt.title(f'Heatmap of values for target cluster {target_cluster} ({fn.__name__})')
+    # plt.axis('equal')
+    if ax is None:
+        plt.show()

@@ -6,6 +6,11 @@ from sklearn.decomposition import PCA
 
 
 def random_opt(start, gain, max_fails=25):
+    """
+    Random optimization algorithm. 
+    Picks a random point close to current, and moves to it if it improves the objective.
+    Stops after max_fails failed attempts.
+    """
     start = torch.from_numpy(start)
     fails = 0
     iter = 0
@@ -30,6 +35,10 @@ def random_opt(start, gain, max_fails=25):
 
 
 def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
+    """
+    Gradient ascent algorithm.
+    Very basic implementation for testing. Too dependent on parameters
+    """
     current = torch.from_numpy(start)
     current.requires_grad = True
 
@@ -40,7 +49,6 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
     history = current
     
     while iter_count < max_iter and fails < 100:
-        # Compute gradient
         score = gain(current)
         score.backward()
         grad = current.grad
@@ -52,28 +60,21 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
         with torch.no_grad():
             prev_score = gain(current)
             
-            # Update current point
             damp = iter_count // 100 + 1
             current = current + (lr / damp) * grad
             
-            # Evaluate new point
             new_score = gain(current)
             improvement = new_score - prev_score
             
-            # Track best solution
             if new_score > best_score:
                 best = current
                 best_score = new_score
                 fails = 0
             else:
                 fails += 1
-            
-        # Reset gradient for next iteration
         current.requires_grad = True
         
-        # Record history
         history = torch.vstack([history, current])
-        
         if dbg:
             print(f"iter: {iter_count}, score: {new_score}, imp: {improvement}, grad: {torch.linalg.norm(grad)}")
             
@@ -87,6 +88,9 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
 class Gainer:
     def __init__(self, C, X, target, x, **kwargs):
         """
+        Class for computing the score of a counterfactual solution.
+        The score is the product of several terms, which are defined in the gain_weights dictionary.
+
         Parameters
         ----------
         C: cluster centers
@@ -146,32 +150,50 @@ class Gainer:
         c = self.C[[self.target]]
         dists = torch.linalg.norm(self.X[self.y==self.target] - c, axis=1)
         return torch.max(dists), torch.min(dists)
+
+    def gain(self, cf):
+        # gain = sum([term(cf)*weight for term,weight in self.gain_weights.items()])
+        # gain = math.prod([(term(cf)) for term in self.gain_weights.keys()])
+        gain = torch.tensor(1, dtype=torch.float64)
+        for term in self.gain_weights.keys():
+            t = term(cf)
+            # print(f"{term.__name__}: {t}")
+            gain *= t
+        return gain
     
-    def ygain(self, cf):
+    def gower_gain(self, cf):
+        """
+        Inverse Gower's distance between the counterfactual and the original instance.
+        """
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+        diffs = torch.abs(cf - self.x)
+        scaled_diffs = diffs / self.feature_ranges
+        scaled_diffs[scaled_diffs != scaled_diffs] = 0
+        sims = 1 - scaled_diffs
+        res = torch.mean(sims)
+        return res
+    
+    def sig(self, d):
+        off = (1 - self.eps) * self.max_t
+        # off = 0.5
+        base = 10000
+        e = base ** (d - off)
+        return 1 / (1 + e)
+        
+    def sigmoid_hinge_gain(self, cf):
+        """
+        Sigmoid-like function that encourages being close to the target cluster center.
+        """
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
         d = torch.linalg.norm(cf - self.C[[self.target]])
-        y = (d - self.min_t)/(self.max_t - self.min_t)
-        return 1 - torch.clip(y, 0, 1)
+        return self.sig(d)
     
-    def sim_gain(self, cf):
-        d = torch.linalg.norm(cf - self.x)
-        d_sim = (d - self.min_t)/(self.max_t - self.min_t)
-        return 1 - torch.clip(d_sim, 0, 1)
-
-    def dist_gain(self, cf):
-        if type(cf) is np.ndarray:
-            cf = torch.from_numpy(cf)
-        d = torch.linalg.norm(cf - self.x)
-        return 1 - d
-    
-    def is_valid(self, cf):
-        if type(cf) is np.ndarray:
-            cf = torch.from_numpy(cf)
-        cf_cluster = self._classify(cf)
-        valid = (cf_cluster == self.target)
-        ret = torch.maximum(valid, torch.tensor(0.5))
-        return ret[0]
-
     def smooth_is_valid(self, cf):
+        """
+        Smoothed version of is_valid that encourages the counterfactual to be in the target cluster.
+        """
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
 
@@ -191,21 +213,32 @@ class Gainer:
         # print everything above
         bar = torch.minimum(torch.tensor(1), foo)
         return bar
+    
 
-    def sig(self, d):
-        off = (1 - self.eps) * self.max_t
-        # off = 0.5
-        base = 10000
-        e = base ** (d - off)
-        return 1 / (1 + e)
-        
+    # Below are some alternative functions used in testing, but not in the final implementation
 
-    def sigmoid_hinge_gain(self, cf):
+    def baycon_gain(self, cf):
+        return self.sim_gain(cf) * self.sparsity_gain(cf) * self.gower_gain(cf)
+
+    def dist_gain(self, cf):
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
-        d = torch.linalg.norm(cf - self.C[[self.target]])
-        return self.sig(d)
-        
+        d = torch.linalg.norm(cf - self.x)
+        return 1 - d
+
+    def is_valid(self, cf):
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
+        cf_cluster = self._classify(cf)
+        valid = (cf_cluster == self.target)
+        ret = torch.maximum(valid, torch.tensor(0.5))
+        return ret[0]
+
+    def sim_gain(self, cf):
+        d = torch.linalg.norm(cf - self.x)
+        d_sim = (d - self.min_t)/(self.max_t - self.min_t)
+        return 1 - torch.clip(d_sim, 0, 1)
+
     def sparsity_gain(self, cf):
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
@@ -213,32 +246,10 @@ class Gainer:
         i = torch.isclose(cf, self.x, atol=0.01).mean(dtype=torch.float64)
         return torch.maximum(torch.tensor(0.1 / cf.shape[1]), i)
 
-    def gower_gain(self, cf):
-        """
-        Inverse Gower's distance between the counterfactual and the original instance.
-        WARNING: CAUSES NaNs in gradient!
-        """
-        if type(cf) is np.ndarray:
-            cf = torch.from_numpy(cf)
-        diffs = torch.abs(cf - self.x)
-        scaled_diffs = diffs / self.feature_ranges
-        scaled_diffs[scaled_diffs != scaled_diffs] = 0
-        sims = 1 - scaled_diffs
-        res = torch.mean(sims)
-        return res
-    
-    def baycon_gain(self, cf):
-        return self.sim_gain(cf) * self.sparsity_gain(cf) * self.gower_gain(cf)
-        
-    def gain(self, cf):
-        # gain = sum([term(cf)*weight for term,weight in self.gain_weights.items()])
-        # gain = math.prod([(term(cf)) for term in self.gain_weights.keys()])
-        gain = torch.tensor(1, dtype=torch.float64)
-        for term in self.gain_weights.keys():
-            t = term(cf)
-            # print(f"{term.__name__}: {t}")
-            gain *= t
-        return gain
+    def ygain(self, cf):
+        d = torch.linalg.norm(cf - self.C[[self.target]])
+        y = (d - self.min_t)/(self.max_t - self.min_t)
+        return 1 - torch.clip(y, 0, 1)
 
 
 def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solutions=None, histories=None, ax=None):

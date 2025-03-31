@@ -60,6 +60,8 @@ class ThresholdTree():
         self._DTC_model = clf
         feature = tree_model.feature
         threshold = tree_model.threshold
+
+        # Generate parent list for tree
         parent = np.full(n_total_nodes, -1, dtype=int)
         for i in range(n_total_nodes):
             if tree_model.children_left[i] != -1:
@@ -83,12 +85,6 @@ class ThresholdTree():
         inst = inst.astype(np.float32)
         targ = targ.astype(np.float32)
         inst_leaf_id = tree_model.apply(inst)
-
-
-
-        # inst_node_indicator = np.array(tree_model.decision_path(inst).todense())[0]
-        # target_node_indicator = np.array(tree_model.decision_path(targ).todense())[0]
-        # target_leaf_id = tree_model.apply(targ)
 
         cfs = np.zeros(shape=(target_leafs.shape[0], self._dims))
         cfs_prime = np.zeros(shape=(target_leafs.shape[0], self._dims))
@@ -306,6 +302,9 @@ class ThresholdTree():
             raise TypeError("IMM tree hasn't been trained.")
         
     def _imm_plot_decision_boundaries(self, node, x_min, x_max, y_min, y_max, depth=0):
+        """
+        Private method for plotting decision boundaries of the IMM tree.
+        """
         if node is None or node.cluster is not None:
             return
         

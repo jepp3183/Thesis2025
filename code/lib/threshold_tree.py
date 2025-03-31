@@ -13,7 +13,7 @@ class ThresholdTree():
         """
         Parameters
         ----------
-        model : Trained model
+        model : Trained clustering model
         c : Cluster centers
         X : Training data
         y : Training labels

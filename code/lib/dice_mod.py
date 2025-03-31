@@ -30,7 +30,7 @@ def random_opt(start, gain, max_fails=25):
     return best, history
 
 
-def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False):
+def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False, max_iter=1000):
     current = torch.from_numpy(start)
     current.requires_grad = True
 
@@ -41,7 +41,7 @@ def gradient_ascent(start: np.ndarray, gain, lr = 0.1, dbg=False):
     best_score = 0
     history = current
     # while (torch.linalg.norm(grad) > 0.001 or imp > 0.01) and iter < 2000:
-    while iter < 1000 and fails < 100:
+    while iter < max_iter and fails < 100:
         foo = gain(current)
         foo.backward()
         grad = current.grad

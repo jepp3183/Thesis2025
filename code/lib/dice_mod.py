@@ -152,20 +152,6 @@ class Gainer:
         d = torch.linalg.norm(cf - self.x)
         return 1 - d
     
-    # def is_closer(self, cf):
-    #     """Returns true if the given cf is closer to target center than original center"""
-    #     return torch.linalg.norm(cf - self.C[[self.instance_cluster]]) > torch.linalg.norm(cf - self.C[[self.target]])
-    
-    # def binary_hinge_loss(self, cf):
-    #     return int(not self.is_closer(cf))
-    
-    # def hinge_similarity_loss(self, cf):
-    #     halfway = torch.mean([self.C[[self.target]], self.C[[self.instance_cluster]]], axis=0)
-    #     d = torch.linalg.norm(cf - halfway)
-    #     d_sim = d / torch.linalg.norm(self.C[[self.target]] - halfway[:, None])
-
-    #     return int(not self.is_closer(cf)) + d_sim - 1
-
     def is_valid(self, cf):
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
@@ -200,7 +186,7 @@ class Gainer:
         # off = 0.5
         base = 10000
         e = base ** (d - off)
-        return (1 / (1 + e))
+        return 1 / (1 + e)
         
 
     def sigmoid_hinge_gain(self, cf):
@@ -238,5 +224,7 @@ class Gainer:
         # gain = math.prod([(term(cf)) for term in self.gain_weights.keys()])
         gain = torch.tensor(1, dtype=torch.float64)
         for term in self.gain_weights.keys():
-            gain *= term(cf)
+            t = term(cf)
+            # print(f"{term.__name__}: {t}")
+            gain *= t
         return gain

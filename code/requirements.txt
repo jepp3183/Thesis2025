@@ -1,14 +1,12 @@
-ipython
-ipykernel
-jupyter
-notebook
-tqdm
 matplotlib
-numpy==1.26.3
+numpy==1.26.2
 scikit-learn
 pandas
 seaborn
-mmd-critic
+tensorflow
+keras
 torch
-# interpret
-# dice-ml
+debugpy
+dice-ml
+mmd-critic
+umap-learn

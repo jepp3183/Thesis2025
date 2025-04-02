@@ -1,4 +1,4 @@
-from imm import imm
+from lib.imm import imm
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt

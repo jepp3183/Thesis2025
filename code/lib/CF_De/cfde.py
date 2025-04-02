@@ -121,7 +121,7 @@ def Simple_CF_Descent(
                 if len(changed_features) == 0:
                     penalty = 1.0
                 else:
-                    penalty = np.pow([feature_penalty], [len(changed_features)])[0]
+                    penalty = feature_penalty**len(changed_features)
 
             cf_prime = cf.copy()
 

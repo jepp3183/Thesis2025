@@ -1,3 +1,5 @@
+#import "../lib.typ": *
+
 = Explainable AI
 //TODO: chapter intro? explain goal of chapter, focus of thesis etc.?
 //maybe outline some different types of explanations? feature importance, gradients, etc?

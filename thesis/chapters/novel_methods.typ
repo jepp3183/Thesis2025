@@ -22,7 +22,7 @@ The only difference between $c_"target"$ and $c'_"target"$ is the addition of $h
 $ c'_"target" &= 1/(|c_"target"| + 1) (hat(x) + sum_(x in C_"target") x) \
 &= 1/(|c_"target"| + 1) hat(x) + 1/(|c_"target"| + 1) sum_(x in C_"target") x $<proof:lemmaCloser>
 This implies that either $hat(x)=c_"target"$ in which case $d(hat(x),c'_"target")=d(hat(x),c_"target")=0$ since adding a point at the center of clustering does not change it, or that $hat(x)!=c_"target"$ in which case $d(c'_"target",hat(x)) < d(c_"target",hat(x))$ holds due to the first term in @proof:lemmaCloser will always result in center close to $hat(x)$ than before. Since this covers both cases the proof is complete.
-]
+]#todo(position: right)[TODO: only with 2 centers]
 
 The idea behind why @lemma_cf_dis allows us to make better counterfactuals is that since the target cluster-center is closer to the counterfactual, the clustering boundary also changes. This observation implies that the counterfactual will be further from the clustering boundary than expected when creating the counterfactual, which allows us to move it closer to the original point without invalidating the counterfactual. 
 

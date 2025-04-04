@@ -83,7 +83,7 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
     print(f"iter: {iter_count}, score: {best_score}")
     return best.detach().numpy(), history.detach().numpy()
 
-def adam_opt(start: np.ndarray, gain, lr=1, max_iter=1000):
+def adam_opt(start: np.ndarray, gain, lr=0.1, max_iter=1000):
     """
     ADAM optimization algorithm using PyTorch's optimizer.
     """
@@ -171,6 +171,10 @@ class Gainer:
             torch.linalg.norm(self.X[self.y==self.target] - self.C[[self.target]], axis=1)
         )
 
+        dists = torch.linalg.norm(self.C - self.C[self.target], axis=1)
+        sorted, _indices = torch.sort(dists, descending=False)
+        self.sig_offset = sorted[1] / 2
+
         feature_mins = self.X.min(0).values
         feature_maxs = self.X.max(0).values
         self.feature_ranges = feature_maxs - feature_mins
@@ -200,10 +204,12 @@ class Gainer:
         # gain = sum([term(cf)*weight for term,weight in self.gain_weights.items()])
         # gain = math.prod([(term(cf)) for term in self.gain_weights.keys()])
         gain = torch.tensor(1, dtype=torch.float64)
+        # s = []
         for term in self.gain_weights.keys():
             t = term(cf)
-            print(f"{term.__name__}: {t}")
+            # s.append(f"{term.__name__}: {t}")
             gain *= t
+        # print(f"score: {gain}, gains: {s}")
         return gain
     
     def gower_gain(self, cf):
@@ -221,11 +227,20 @@ class Gainer:
         return res
     
     def sig(self, d):
-        off = (1 - self.eps) * self.max_t
-        # off = 0.5
-        base = 10000
-        e = base ** (d - off)
-        return 1 / (1 + e)
+        # off = (1 - self.eps) * self.max_t
+        off = (1 - self.eps)*self.sig_offset
+
+        if d < off:
+            base = 10_000
+            alpha = 1
+            e = base ** (alpha*(d - off))
+            res = 1 / (1 + e)
+            return res
+            
+        d_instance_target = torch.linalg.norm(self.C[[self.target]] - self.x)
+        res = (d_instance_target - d)/((d_instance_target - off)*2)
+
+        return torch.maximum(torch.tensor(0.), res)
         
     def sigmoid_hinge_gain(self, cf):
         """
@@ -254,9 +269,7 @@ class Gainer:
         min_dist = torch.min(dists)
         t_dist = torch.linalg.norm(cf - self.C[[self.target]])
         
-        # return min_dist / (t_dist + min_dist)
         foo = (min_dist + t_dist) / (2 * t_dist)
-        # print everything above
         bar = torch.minimum(torch.tensor(1), foo)
         return bar
     

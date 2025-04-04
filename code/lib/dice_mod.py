@@ -5,7 +5,7 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 
 
-def random_opt(start, gain, max_fails=25):
+def random_opt(start, gain, max_fails=100):
     """
     Random optimization algorithm. 
     Picks a random point close to current, and moves to it if it improves the objective.
@@ -52,8 +52,8 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
         score = gain(current)
         score.backward()
         grad = current.grad
-        if grad is None:
-            print("grad is None")
+        if grad is None: 
+            print("None gradient")
             break
         grad[grad.isnan()] = 0
 
@@ -82,8 +82,53 @@ def gradient_ascent(start: np.ndarray, gain, lr=0.1, dbg=False, max_iter=1000):
         
     print(f"iter: {iter_count}, score: {best_score}")
     return best.detach().numpy(), history.detach().numpy()
+
+def adam_opt(start: np.ndarray, gain, lr=1, max_iter=1000):
+    """
+    ADAM optimization algorithm using PyTorch's optimizer.
+    """
+    current = torch.from_numpy(start).clone().detach()
+    current.requires_grad = True
     
+    optimizer = torch.optim.Adam([current], lr=lr)
     
+    iter_count = 1
+    fails = 0
+    best = current.clone().detach()
+    best_score = gain(best)
+    history = current.clone().detach()
+    
+    while iter_count < max_iter and fails < 100:
+        # ADAM minimizes, so negate
+        optimizer.zero_grad()
+        score = -gain(current)
+        score.backward()
+        if current.grad is None: 
+            print("None gradient")
+            break
+        current.grad[torch.isnan(current.grad)] = 0
+        
+        optimizer.step()
+        
+        with torch.no_grad():
+            new_score = gain(current)
+            
+            if new_score > best_score:
+                best = current.clone().detach()
+                best_score = new_score
+                fails = 0
+            else:
+                fails += 1
+            
+            history = torch.vstack([history, current.clone().detach()])
+        
+        current.requires_grad = True
+        
+        iter_count += 1
+    
+    print(f"iter: {iter_count}, score: {best_score}")
+    return best.detach().numpy(), history.detach().numpy()
+
 
 class Gainer:
     def __init__(self, C, X, target, x, **kwargs):
@@ -157,7 +202,7 @@ class Gainer:
         gain = torch.tensor(1, dtype=torch.float64)
         for term in self.gain_weights.keys():
             t = term(cf)
-            # print(f"{term.__name__}: {t}")
+            print(f"{term.__name__}: {t}")
             gain *= t
         return gain
     
@@ -172,6 +217,7 @@ class Gainer:
         scaled_diffs[scaled_diffs != scaled_diffs] = 0
         sims = 1 - scaled_diffs
         res = torch.mean(sims)
+        assert 0 <= res and res <= 1, f"Invalid Gower gain: {res}"
         return res
     
     def sig(self, d):

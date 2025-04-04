@@ -24,6 +24,7 @@ class ThresholdTree():
         self.y = y
         self._dims = len(X[0])
         self._DTC_model = None
+        self._DTC_tree = None
         self._DTC_instance = None
         self._DTC_cfs = None
         self._DTC_cfs_prime = None
@@ -31,7 +32,7 @@ class ThresholdTree():
         self._IMM_instance = None
         self._IMM_cf = None
 
-    def find_counterfactuals_DTC(self, instance, target, min_impurity_decrease=0.001, threshold_change=0.0001, robustness_factor=0.7):
+    def find_counterfactuals_dtc(self, instance, target, min_impurity_decrease=0.001, threshold_change=0.1, robustness_factor=0.7):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -58,6 +59,7 @@ class ThresholdTree():
 
         tree_model = clf.tree_
         self._DTC_model = clf
+        self._DTC_tree = tree_model
         feature = tree_model.feature
         threshold = tree_model.threshold
 
@@ -181,7 +183,7 @@ class ThresholdTree():
         self._DTC_cfs_prime = cfs_prime
         return all_cfs
     
-    def print_DTC_tree(self):
+    def print_dtc_tree(self):
         """
         Print the Decision Tree Classifier tree.
 
@@ -194,7 +196,7 @@ class ThresholdTree():
         else:
             raise TypeError("Decision Tree Classifier tree hasn't been trained.")
 
-    def plot_DTC_tree(self):
+    def plot_dtc_tree_colorized(self):
         """
         Plot the Decision Tree Classifier boundaries together with instance and counterfactuals.
 
@@ -240,7 +242,48 @@ class ThresholdTree():
         plt.title('Clusters, Decision Boundaries, Initial Point, and Counterfactual')
         plt.show()
 
-    def find_counterfactuals_IMM(self, instance, target, threshold_change=0.0001):
+    def _dtc_plot_decision_boundaries(self, node, x_min, x_max, y_min, y_max, depth=0):
+        """
+        Private method for plotting decision boundaries of the DTC tree.
+        """
+        if node == -1:
+            return
+        
+        if self._DTC_tree.feature[node] == 0:
+            plt.plot([self._DTC_tree.threshold[node], self._DTC_tree.threshold[node]], [y_min, y_max], 'k-', lw=1)
+            self._dtc_plot_decision_boundaries(self._DTC_tree.children_left[node], x_min, self._DTC_tree.threshold[node], y_min, y_max, depth + 1)
+            self._dtc_plot_decision_boundaries(self._DTC_tree.children_right[node], self._DTC_tree.threshold[node], x_max, y_min, y_max, depth + 1)
+        elif self._DTC_tree.feature[node] == 1:
+            plt.plot([x_min, x_max], [self._DTC_tree.threshold[node], self._DTC_tree.threshold[node]], 'k-', lw=1)
+            self._dtc_plot_decision_boundaries(self._DTC_tree.children_left[node], x_min, x_max, y_min, self._DTC_tree.threshold[node], depth + 1)
+            self._dtc_plot_decision_boundaries(self._DTC_tree.children_right[node], x_min, x_max, self._DTC_tree.threshold[node], y_max, depth + 1)
+
+    def plot_dtc_tree(self):
+        """
+        Plot the DTC boundaries together with instance and counterfactuals.
+
+        Raises TypeError if the DTC tree hasn't been trained.
+        """
+        if self._DTC_model is None:
+            raise TypeError("DTC tree hasn't been trained.")
+        elif self._DTC_instance.shape[0] != 2:
+            raise ValueError("Only 2D data can be plotted.")
+
+        # Assuming imm_model is an instance of the imm class and has been fitted
+        root_node = 0
+
+        # Plot the data points
+        sns.scatterplot(x=self.X[:, 0], y=self.X[:, 1], hue=self.y, legend='full')
+        sns.scatterplot(x=self._DTC_cfs[:,0], y=self._DTC_cfs[:,1], color='green', s=100, label='Counterfactual')
+        sns.scatterplot(x=self._DTC_cfs_prime[:,0], y=self._DTC_cfs_prime[:,1], color='yellow', s=100, label='C\'')
+        sns.scatterplot(x=[self._DTC_instance[0]], y=[self._DTC_instance[1]], color='red', s=100, label='Initial Point')
+
+        # Plot the decision boundaries
+        self._dtc_plot_decision_boundaries(root_node, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
+
+        plt.show()
+
+    def find_counterfactuals_imm(self, instance, target, threshold_change=0.0001):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -290,7 +333,7 @@ class ThresholdTree():
         self._IMM_cf = cf
         return np.array([cf])
 
-    def print_IMM_tree(self):
+    def print_imm_tree(self):
         """
         Print the IMM tree.
 
@@ -317,7 +360,7 @@ class ThresholdTree():
             self._imm_plot_decision_boundaries(node.left, x_min, x_max, y_min, node.threshold, depth + 1)
             self._imm_plot_decision_boundaries(node.right, x_min, x_max, node.threshold, y_max, depth + 1)
 
-    def plot_IMM_tree(self):
+    def plot_imm_tree(self):
         """
         Plot the IMM boundaries together with instance and counterfactuals.
 

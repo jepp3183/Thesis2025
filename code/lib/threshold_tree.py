@@ -4,6 +4,7 @@ from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt
 from sklearn import tree
 import seaborn as sns
+import pandas as pd
 
 
 
@@ -31,8 +32,9 @@ class ThresholdTree():
         self._IMM_model = None
         self._IMM_instance = None
         self._IMM_cf = None
+        self._IMM_cf_prime = None
 
-    def find_counterfactuals_dtc(self, instance, target, min_impurity_decrease=0.001, threshold_change=0.1, robustness_factor=0.7):
+    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -40,6 +42,9 @@ class ThresholdTree():
         ----------
         instance : Data point
         target : Target label
+        threshold_change : Change from threshold when changing the feature
+        robustness_factor : Factor to increase the robustness of the counterfactual
+        min_impurity_decrease : Minimum impurity decrease to split a node using DTC
 
         Returns
         -------
@@ -154,7 +159,7 @@ class ThresholdTree():
             cf = np.array(cf)
             cf = cf.astype(np.float32)
             change = cf - instance
-            change[change < 0.00001] = 0
+            change[np.isclose(change, 0, atol=0.00001)] = 0
             # print(f"Counterfactual change: {change}")
             # print(f"Counterfactual Tree index: {tree_model.apply(np.array([cf]))}")
 
@@ -177,11 +182,11 @@ class ThresholdTree():
         # print("Counterfactuals': ")
         # print(cfs_prime)
         print("")
-        all_cfs = np.concatenate((cfs, cfs_prime), axis=0)
+        # all_cfs = np.concatenate((cfs, cfs_prime), axis=0)
         self._DTC_instance = instance
         self._DTC_cfs = cfs
         self._DTC_cfs_prime = cfs_prime
-        return all_cfs
+        return cfs, cfs_prime
     
     def print_dtc_tree(self):
         """
@@ -195,52 +200,6 @@ class ThresholdTree():
             plt.show()
         else:
             raise TypeError("Decision Tree Classifier tree hasn't been trained.")
-
-    def plot_dtc_tree_colorized(self):
-        """
-        Plot the Decision Tree Classifier boundaries together with instance and counterfactuals.
-
-        Raises TypeError if the Decision Tree Classifier tree hasn't been trained.
-        """
-        # Assuming X, y, instance, target_point, cf, and tree_model are already defined
-        if self._DTC_model is None:
-            raise TypeError("Decision Tree Classifier tree hasn't been trained.")
-        elif self._DTC_instance.shape[0] != 2:
-            raise ValueError("Only 2D data can be plotted.")
-
-        # Plot the data points and clusters
-        plt.figure(figsize=(10, 6))
-        unique_labels = np.unique(self.y)
-        palette = sns.color_palette("husl", len(unique_labels))  # Use a distinct color palette
-        sns.scatterplot(x=self.X[:, 0], y=self.X[:, 1], hue=self.y, palette=palette, alpha=0.6, edgecolor=None, legend='full')
-
-        # Plot the initial point
-        plt.scatter(self._DTC_instance[0], self._DTC_instance[1], color='red', s=100, label='Initial Point')
-
-        # Plot the counterfactual
-        for cf in self._DTC_cfs:
-            plt.scatter(cf[0], cf[1], color='green', s=100, label='Counterfactual')
-
-        for cf in self._DTC_cfs_prime:
-            plt.scatter(cf[0], cf[1], color='yellow', s=100, label='C\'')
-
-        # Plot the decision boundaries
-        plot_step = 0.01
-        x_min, x_max = self.X[:, 0].min() - 1, self.X[:, 0].max() + 1
-        y_min, y_max = self.X[:, 1].min() - 1, self.X[:, 1].max() + 1
-        xx, yy = np.meshgrid(np.arange(x_min, x_max, plot_step), np.arange(y_min, y_max, plot_step))
-        Z = self._DTC_model.predict(np.c_[xx.ravel(), yy.ravel()])
-        Z = Z.reshape(xx.shape)
-        plt.contourf(xx, yy, Z, alpha=0.3, cmap='viridis')
-
-        # Add labels and legend
-        plt.xlabel('Feature 1')
-        plt.ylabel('Feature 2')
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys())
-        plt.title('Clusters, Decision Boundaries, Initial Point, and Counterfactual')
-        plt.show()
 
     def _dtc_plot_decision_boundaries(self, node, x_min, x_max, y_min, y_max, depth=0):
         """
@@ -273,17 +232,25 @@ class ThresholdTree():
         root_node = 0
 
         # Plot the data points
-        sns.scatterplot(x=self.X[:, 0], y=self.X[:, 1], hue=self.y, legend='full')
-        sns.scatterplot(x=self._DTC_cfs[:,0], y=self._DTC_cfs[:,1], color='green', s=100, label='Counterfactual')
-        sns.scatterplot(x=self._DTC_cfs_prime[:,0], y=self._DTC_cfs_prime[:,1], color='yellow', s=100, label='C\'')
-        sns.scatterplot(x=[self._DTC_instance[0]], y=[self._DTC_instance[1]], color='red', s=100, label='Initial Point')
+        df = pd.DataFrame(self.X, columns=['x1', 'x2'])
+        df['label'] = [f'Cluster {i}' for i in self.y]
+        df = df.sort_values(by='label')
+
+        sns.scatterplot(df, x='x1', y='x2', hue='label', palette="Set2", legend='full')
+        # Plot centroids
+        sns.scatterplot(x=self.centers[:, 0], y=self.centers[:, 1], color='black', s=70, label='Cluster Centers')
+        sns.scatterplot(x=[self._DTC_instance[0]], y=[self._DTC_instance[1]], color='red', s=120, label='Instance')
+        sns.scatterplot(x=self._DTC_cfs[:,0], y=self._DTC_cfs[:,1], color='blue', s=120, label='Counterfactual')
+        sns.scatterplot(x=self._DTC_cfs_prime[:,0], y=self._DTC_cfs_prime[:,1], color='green', s=120, label='C\'')
 
         # Plot the decision boundaries
         self._dtc_plot_decision_boundaries(root_node, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
-
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('Decision Tree Classifier Boundaries with Counterfactuals')
         plt.show()
 
-    def find_counterfactuals_imm(self, instance, target, threshold_change=0.0001):
+    def find_counterfactuals_imm(self, instance, target, threshold_change=0.0001, robustness_factor=0.7):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -291,6 +258,8 @@ class ThresholdTree():
         ----------
         instance : Data point
         target : Target label
+        threshold_change : Change from threshold when changing the feature
+        robustness_factor : Factor to increase the robustness of the counterfactual 
 
         Returns
         -------
@@ -299,9 +268,10 @@ class ThresholdTree():
         imm_model = imm()
         imm_model.fit(self.X, self.y, self.centers)
         self._IMM_model = imm_model
+        target_point = self.centers[target, :]
 
         instance_path = imm_model.get_path(instance)
-        target_path = imm_model.get_path(self.centers[target, :])
+        target_path = imm_model.get_path(target_point)
         # print(f"Instance path: {instance_path}")
         # print(f"Target path: {target_path}\n")
 
@@ -324,14 +294,31 @@ class ThresholdTree():
                 if cf[curr_node.feature] < curr_node.threshold:
                     cf[curr_node.feature] = curr_node.threshold + threshold_change
 
-        # print("Instance: ", instance)
-        # print("Counterfactual: ", cf)
+        change = cf - instance
+        print(change)
+        change[np.isclose(change, 0, atol=0.00001)] = 0
+        cf_prime = cf.copy()
+        for i in range(self._dims):
+            if change[i] != 0:
+                change_prime = instance[i] + change[i] + ((target_point[i] - cf[i]) * robustness_factor)
+                temp_cf = cf_prime.copy()
+                temp_cf[i] = change_prime
+                # print(f"Pred: ", clf.predict([temp_cf2]))
+                if imm_model.predict(temp_cf) == target:
+                    cf_prime[i] = change_prime
+                else:
+                    print("can't change")
+
+        print("Instance: ", instance)
+        print("Counterfactual: ", cf)
+        print("Counterfactual': ", cf_prime)
         # print("")
         # print("Original class: ", imm_model.predict(instance))
         # print("Counterfactual class: ", imm_model.predict(cf))
         self._IMM_instance = instance
         self._IMM_cf = cf
-        return np.array([cf])
+        self._IMM_cf_prime = cf_prime
+        return np.array([cf]), np.array([cf_prime])
 
     def print_imm_tree(self):
         """
@@ -375,13 +362,22 @@ class ThresholdTree():
         tree = self._IMM_model.tree
 
         # Plot the data points
-        sns.scatterplot(x=self.X[:, 0], y=self.X[:, 1], hue=self.y, legend='full')
-        sns.scatterplot(x=[self._IMM_cf[0]], y=[self._IMM_cf[1]], color='green', s=100, label='Counterfactual')
-        sns.scatterplot(x=[self._IMM_instance[0]], y=[self._IMM_instance[1]], color='red', s=100, label='Initial Point')
+        df = pd.DataFrame(self.X, columns=['x1', 'x2'])
+        df['label'] = [f'Cluster {i}' for i in self.y]
+        df = df.sort_values(by='label')
+
+        sns.scatterplot(df, x='x1', y='x2', hue='label', palette="Set2", legend='full')
+        # Plot centroids
+        sns.scatterplot(x=self.centers[:, 0], y=self.centers[:, 1], color='black', s=70, label='Cluster Centers')
+        sns.scatterplot(x=[self._IMM_instance[0]], y=[self._IMM_instance[1]], color='red', s=120, label='Instance')
+        sns.scatterplot(x=[self._IMM_cf[0]], y=[self._IMM_cf[1]], color='blue', s=120, label='Counterfactual')
+        sns.scatterplot(x=[self._IMM_cf_prime[0]], y=[self._IMM_cf_prime[1]], color='green', s=120, label='C\'')
 
         # Plot the decision boundaries
         self._imm_plot_decision_boundaries(tree, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('IMM Boundaries with Counterfactuals')
 
         plt.show()
-        
         

@@ -173,7 +173,8 @@ class Gainer:
 
         dists = torch.linalg.norm(self.C - self.C[self.target], axis=1)
         sorted, _indices = torch.sort(dists, descending=False)
-        self.sig_offset = sorted[1] / 2
+        decision_len = sorted[1] / 2
+        self.sig_offset = min(decision_len, self.max_t)
 
         feature_mins = self.X.min(0).values
         feature_maxs = self.X.max(0).values
@@ -182,7 +183,7 @@ class Gainer:
         self.gain_weights = {
             self.gower_gain: 1,
             self.sigmoid_hinge_gain: 1,
-            self.smooth_is_valid: 1,
+            # self.smooth_is_valid: 1,
             # self.baycon_gain: 1,
             # self.dist_gain: 0.5,
             # self.is_valid: 1,
@@ -231,9 +232,8 @@ class Gainer:
         off = (1 - self.eps)*self.sig_offset
 
         if d < off:
-            base = 10_000
-            alpha = 1
-            e = base ** (alpha*(d - off))
+            base = 2.718
+            e = base ** (50*(d - off))
             res = 1 / (1 + e)
             return res
             
@@ -294,6 +294,8 @@ class Gainer:
         return ret[0]
 
     def sim_gain(self, cf):
+        if type(cf) is np.ndarray:
+            cf = torch.from_numpy(cf)
         d = torch.linalg.norm(cf - self.x)
         d_sim = (d - self.min_t)/(self.max_t - self.min_t)
         return 1 - torch.clip(d_sim, 0, 1)
@@ -302,7 +304,7 @@ class Gainer:
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
 
-        i = torch.isclose(cf, self.x, atol=0.01).mean(dtype=torch.float64)
+        i = torch.isclose(cf, self.x, atol=0.0001).mean(dtype=torch.float64)
         return torch.maximum(torch.tensor(0.1 / cf.shape[1]), i)
 
     def ygain(self, cf):

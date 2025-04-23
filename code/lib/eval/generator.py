@@ -10,11 +10,14 @@ class metrics(Enum):
     
 def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity]):
     results = {method["name"]: [] for method in methods}
-
     for method in methods:
+        print("Starting on: " + method["name"])
         cfs_data = method["counterfactuals"]
         method_name = method["name"]
+        iteration = 0
         for cf_data in cfs_data:
+            print(f"Iter: {iteration}")
+            iteration += 1
             metric = []
             cf = np.array(cf_data.cf)
             instance = X[cf_data.instance]
@@ -38,4 +41,7 @@ def run(methods, centers, X, y, m = [metrics.Similarity, metrics.Minimality, met
                 metric.append(div)
 
             results[method_name].append(metric)
-    return results, ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity"]
+    return results, returnNames()
+
+def returnNames():
+    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity"]

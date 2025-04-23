@@ -79,6 +79,7 @@ While counterfactuals for classification is a well-studied area, there is less l
 #include "chapters/novel_methods.typ"
 #include "chapters/cf_heuristic_methods.typ"
 #include "chapters/cf_tree_based_methods.typ"
+#include "chapters/dice_mod.typ"
 
 #pagebreak()
 #bibliography("bibliography.bib", style: "springer-vancouver")

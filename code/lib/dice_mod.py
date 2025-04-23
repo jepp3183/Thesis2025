@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 from sklearn.decomposition import PCA
 
 
@@ -215,7 +216,7 @@ class Gainer:
     
     def gower_gain(self, cf):
         """
-        Inverse Gower's distance between the counterfactual and the original instance.
+        Gower's similarity between the counterfactual and the original instance.
         """
         if type(cf) is np.ndarray:
             cf = torch.from_numpy(cf)
@@ -342,9 +343,15 @@ def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solut
     unique_labels = np.unique(y)
     palette = sns.color_palette("husl", len(unique_labels))  # Use a distinct color palette
 
-    sns.scatterplot(x=X[:, 0], y=X[:, 1], hue=y, palette=palette, ax=ax)
-    sns.scatterplot(x=C[:, 0], y=C[:, 1], color='red', s=100, marker='o', ax=ax)
-    sns.scatterplot(x=random_point[:, 0], y=random_point[:, 1], color='green', s=100, marker='o', ax=ax)
+    df = pd.DataFrame(X, columns=['x1', 'x2'])
+    df['label'] = [f'Cluster {i}' for i in y]
+    df = df.sort_values(by='label')
+    
+    sns.scatterplot(df, x='x1', y='x2', hue='label', palette=palette, ax=ax)
+    sns.scatterplot(x=C[:, 0], y=C[:, 1], color='red', s=100, marker='o', ax=ax, label='Cluster Centers')
+    sns.scatterplot(x=random_point[:, 0], y=random_point[:, 1], color='green', s=100, marker='o', ax=ax, label='Instance')
+
+
     if histories is not None:
         for h in histories:
             p.plot(h[:, 0], h[:, 1], color='black', linewidth=1, linestyle='dashed', markersize=2)

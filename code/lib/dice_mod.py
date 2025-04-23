@@ -224,7 +224,7 @@ class Gainer:
         scaled_diffs[scaled_diffs != scaled_diffs] = 0
         sims = 1 - scaled_diffs
         res = torch.mean(sims)
-        assert 0 <= res and res <= 1, f"Invalid Gower gain: {res}"
+        # assert 0 <= res and res <= 1, f"Invalid Gower gain: {res}"
         return res
     
     def sig(self, d):

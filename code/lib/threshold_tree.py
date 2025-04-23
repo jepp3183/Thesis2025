@@ -181,7 +181,7 @@ class ThresholdTree():
         # print(cfs)
         # print("Counterfactuals': ")
         # print(cfs_prime)
-        print("")
+        # print("")
         # all_cfs = np.concatenate((cfs, cfs_prime), axis=0)
         self._DTC_instance = instance
         self._DTC_cfs = cfs
@@ -295,7 +295,7 @@ class ThresholdTree():
                     cf[curr_node.feature] = curr_node.threshold + threshold_change
 
         change = cf - instance
-        print(change)
+        # print(change)
         change[np.isclose(change, 0, atol=0.00001)] = 0
         cf_prime = cf.copy()
         for i in range(self._dims):
@@ -309,9 +309,9 @@ class ThresholdTree():
                 else:
                     print("can't change")
 
-        print("Instance: ", instance)
-        print("Counterfactual: ", cf)
-        print("Counterfactual': ", cf_prime)
+        # print("Instance: ", instance)
+        # print("Counterfactual: ", cf)
+        # print("Counterfactual': ", cf_prime)
         # print("")
         # print("Original class: ", imm_model.predict(instance))
         # print("Counterfactual class: ", imm_model.predict(cf))

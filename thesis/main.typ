@@ -63,6 +63,10 @@ While counterfactuals for classification is a well-studied area, there is less l
 + Experiments (5-8 pages)
   - Datasets & preprocessing
   - Evaluation metrics
+  - Dataset 1
+  - Dataset 2
+  - Dataset 3
+  - Simulated 2d dataset
   - Baseline method
 + Results (5-8 pages)
   - Presentation of results (tables, figures, digits examples)
@@ -79,7 +83,6 @@ While counterfactuals for classification is a well-studied area, there is less l
 #include "chapters/novel_methods.typ"
 #include "chapters/cf_heuristic_methods.typ"
 #include "chapters/cf_tree_based_methods.typ"
-#include "chapters/dice_mod.typ"
 
 #pagebreak()
 #bibliography("bibliography.bib", style: "springer-vancouver")

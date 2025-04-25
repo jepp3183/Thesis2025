@@ -31,7 +31,7 @@ Where $a.f$ indicates the values stored at row $f$ in vector $a$. $lambda_2$ is 
 
 In order to get an intuitive understanding of CFAE and @cfae_it we now give an informal explanation. Initially, $hat(x)_0$ is equal to the instance $x$ which is the starting point of the method. Then we pick the target, which is chosen amongst the points in the target cluster at random. This random selection exists such that running the method multiple times produces diverse counterfactuals. Then in each iteration we sample $y$ which is a random point in the target cluster. By running through $y$'s features, we find out which feature applied to $hat(x)_i$ weighted by the learning rate gets us the closest to $psi$. This evaluation is weighted by the penalty, such that picking features which we already changed in previous iterations are favored. This iterative process is repeated until the target cluster is reached, after which we terminate the process.
 
-The ideal way of using CFAE is running it multiple times and then picking the best counterfactual amongst them, this is because the target metric is random and hence not guarantied to produce good results in every run-through.
+The ideal way of using CFAE is running it multiple times and then picking the best counterfactual amongst them, this is because the target metric is random and hence not guarantied to produce good results in every run-through. If one would like to generate a single counterfactual, setting $psi=c(C_t)$ is a way to generate a single counterfactual which is not affected by the inconsistent performance of picking a random $psi$.
 
 CFAE aims to fix the issues with CFDE by approaching the target cluster iteratively instead of approaching the origin cluster, this distinction makes it easier to limit the amount of features changed but also allows us to go towards different point in the target cluster and thereby produce diverse counterfactuals. A visualization of CFAE can be seen on @cfae_example. 
 
@@ -68,7 +68,7 @@ Looking at @cfae_alg it not clear whether it always terminates, however this is 
 ]<cfae_terminates>
 
 #proof[
-  Looking at line 3 in @cfae_alg the algorithm only terminates when counterfactual $hat(x)$ belongs to cluster $C_t$. In any of these iterations we have our counterfactual $hat(x)_i$ and sample $y_i$. Since $y_i$ belongs to cluster $C_t$, and hence lies on the other side of clustering boundary respective to $hat(x)_i$ what we want to show is that $d(hat(x)_(i+1),y_i)<d(hat(x)_i,y_i)$, since this implies that we have indeed moved closer to the clustering boundary. If $hat(x)_i=y_i$ then we would already have terminated before entering the current iteration since $y_i$ belongs to $C_t$. If $exists u in F, hat(x)_i.u!=y_i.u$ then it is trivial that changing the respective feature for $hat(x)_i$ such that it is closer to $y_i$ makes the distance shorter. Hence, in each iteration, $hat(x)$ moves closer to the clustering boundary and therefore will at some point cross it due to the fact that not all point can lie exactly on the decision boundary.
+  Looking at line 3 in @cfae_alg, the algorithm only terminates when counterfactual $hat(x)$ belongs to cluster $C_t$. In any of these iterations we have our counterfactual $hat(x)_i$ and sample $y_i$. Since $y_i$ belongs to cluster $C_t$, and hence lies on the other side of clustering boundary respective to $hat(x)_i$ what we want to show is that $d(hat(x)_(i+1),y_i)<d(hat(x)_i,y_i)$, since this implies that we have indeed moved closer to the clustering boundary. If $hat(x)_i=y_i$ then we would already have terminated before entering the current iteration since $y_i$ belongs to $C_t$. If $exists u in F, hat(x)_i.u!=y_i.u$ then it is trivial that changing the respective feature for $hat(x)_i$ such that it is closer to $y_i$ makes the distance shorter. Hence, in each iteration, $hat(x)$ moves closer to the clustering boundary and therefore will at some point cross it due to the fact that not all point can lie exactly on the decision boundary.
 ]<proof_cfae_terminates>
 
 As can be seen in @cfae_terminates the algorithm is not guarantied to terminate when $F_"mutable" != F$. This is because of the argument from @proof_cfae_terminates which stated that if $hat(x)_i = y_i$ the algorithm would have terminated before entering the loop on line 3 in @cfae_alg. If some features are not mutable then this does not hold since we can reach a state where $forall u in F_"mutable", hat(x)_i.u = y_i.u and exists u in F, hat(x)_i.u != y_i.u$. 
@@ -80,18 +80,19 @@ Where $hat(x)_(u,j).i = cases(x_j.i "if" i in u, x.i "else")$ and $j$ is the ass
 
 The model function from @NeCS_obj is defined as:
 $ f(bold(n)) = (<bold(n),bold(V)>)/(|V|) $
+Where $n$ is the is some point and $V$ is the vector going from $c(C_o)->c(C_t)$ such that. Such that the $f(a)$ is $a$ projected unto $V$ divided by distance, which gives a value in the range $[0,1]$ such that when $f(a)$ is high it indicated that $a$ is close to $c(C_t)$.
 
 As can be seen in @NeCS_obj the objective is to find the subset of features such that the resulting counterfactual has score $f(hat(x)_(u,j)) > 0.5$ which implies that is lies in the target cluster. What this problem essentially boils down to for each neighbor is finding the subset of features $u in F$ such that $ceil(f(hat(x)_(u,j))-0.5) = 1$ and $d(x_j,hat(x)_(u,j))$ is minimized. Since the objective function does not require that the produced counterfactuals lie in the correct cluster, it is up to a stopping condition to maintain validity. Metrics such a sparsity and similarity are considered in the stopping condition.
 
 It is however impossible to directly solve this problem due to it being NP-Hard, we show this by reducing it to the Knapsack #todo[source?] problem. The Knapsack problem is concerned with picking a subset of items, all of which have a weight and a score. The goal is to pick the subset with the greatest score with total weight under some threshold.
 
-The NeCS algorithm start with the instance and goes towards the neighbor. The items in the knapsack problem are features, such that putting a feature in the back implies setting $n.u = x.u$. We define the weight of each feature to 1 and the weight threshold to be the budget $b$. Each item's value would then be the resulting counterfactuals objective function score after applying that item's feature. If we have some item $f$ representing feature $f$, then the score would be $f(hat(x)_(u union {f},j)) (d(x,x_j) - d(x_j,hat(x)_(u union {f},j))$.
+The NeCS algorithm start with the instance and goes towards the neighbor. The items in the knapsack problem are features, such that putting a feature in the bag implies setting $x'.u = x_j.u$. We define the weight of each feature to 1 and the weight threshold to be the budget $b$. Each item's value would then be the resulting counterfactuals objective function score after applying that item's feature. If we have some item $f$ representing some feature, then the score would be $f(hat(x)_(u union {f},j)) (d(x,x_j) - d(x_j,hat(x)_(u union {f},j)))$.
 
-This reduction does however not function like the classical definition of the knapsack problem, since the scores of each feature can change dependently of previous items in the bag. This is due to the fact that when a feature $u$ is added to the back, the point $n$ changes, which would invalidate previously calculated distances. The weights never change, so we only consider the version of knapsack where the scores are dependent on previous insertions into the bag. This problem is studied in @gawiejnowiczKnapsackProblemsPositiondependent2023 where they designate our problem as a P2 variation of the knapsack problem. Just like knapsack, the P2 variation is also weakly NP-hard. @gawiejnowiczKnapsackProblemsPositiondependent2023
+This reduction does however not function like the classical definition of the knapsack problem, since the scores of each feature can change dependently of previous items in the bag. This is due to the fact that when a feature $u$ is added to the back, the point $j$ changes, which would invalidate previously calculated distances. The weights never change, so we only consider the version of knapsack where the scores are dependent on previous insertions into the bag. This problem is studied in @gawiejnowiczKnapsackProblemsPositiondependent2023 where they designate our problem as a P2 variation of the knapsack problem. Just like knapsack, the P2 variation is also weakly NP-hard. @gawiejnowiczKnapsackProblemsPositiondependent2023
 
 With this, it is clear that an approximation algorithm is required. We start by redefining our objective. We consider the counterfactual found for each neighbor independently. 
 
-$ beta(x) = max_(u subset F) f(hat(x)_(u)) (d(x,x_j) - d(x_j,hat(x)_(u))) $<NeCS_ind_obj>
+$ "maximize"_(F subset.eq A, |F|<=b) beta(x) = max_(u subset F) f(hat(x)_(u)) (d(x,x_j) - d(x_j,hat(x)_(u))) $<NeCS_ind_obj>
 
 Now, since @NeCS_ind_obj has the three properties required for us to make a greedy algorithm with an approximation guarantee as covered in @nemhauserBestAlgorithmsApproximating1978. These properties are non-negative, non-decreasing and submodular. We will now prove these three properties.
 
@@ -106,18 +107,28 @@ Now, since @NeCS_ind_obj has the three properties required for us to make a gree
   $beta(dot)$ is non-decreasing, meaning that $beta(S) <= beta(T), forall S subset.eq T$.
 ]<NeCS_non_decreasing>
 #proof[
-  For the instance $x$, $S$ is then a subset of features where $hat(x)_S = cases(x.i "if" i in S, hat(x).i "else")$ such tht $S subset.eq F$. Then adding extra features to $S$ such that $T = S union {u subset.eq F}$ would then always move $hat(x)_T$ closer towards $x$ than $hat(x)_S$. Since it holds that $d(hat(x)_T,c_"target")<= d(x,c_"target")$ it also holds that $f(hat(x)_T)>=f(hat(x)_S)$.
+  For the instance $x$, $S$ is then a subset of features where $hat(x)_S = cases(x.i "if" i in S, hat(x).i "else")$ such tht $S subset.eq F$. Then adding extra features to $S$ such that $T = S union {u subset.eq F}$ would then always move $hat(x)_T$ closer towards $x$ than $hat(x)_S$. Since we can now see that $d(hat(x)_T,c_"target")<= d(x,c_"target")$ holds, it is also true that $f(hat(x)_S)<=f(hat(x)_T)$.
 ]
 
 #lemma[
   $beta(dot)$ is submodular, meaning that $beta(S union {i_k}) - beta(S) >= beta(T union {i_k}) - beta(T), forall S subset.eq T $
 ]<NeCS_sub>
 #proof[
-  $ beta(S union {i_k}) - beta(S) &= max_(u subset S union {i_k}) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) - \ &max_(u subset S) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) \ 
-  &>= max_(u subset T union {i_k}) f(  hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) - \ &max_(u subset S) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) space space (1)\
-  &>= max_(u subset T union {i_k}) f(  hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) - \ &max_(u subset T) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) space space (2) \ 
-  &= beta(T union {i_k}) - beta(T) $
-  Steps $(1),(2)$ both were possible due to the non-decreasing property @NeCS_non_decreasing.]
+  
+  $ beta(S union {i_k}) - beta(S) = \  max_(u subset S union {i_k}) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) -  &max_(u subset S) f(hat(x)_(u)) (d(x,x_j) -d(x_j,hat(x)_(u))) $ 
+  $ = max_(u subset S union {i_k}) f(hat(x)_(u)) d(x,x_j) -& f(hat(x)_(u))d(x_j,hat(x)_(u)) \ -  &max_(u subset S) f(hat(x)_(u)) d(x,x_j) - f(hat(x)_(u))d(x_j,hat(x)_(u)) $<NeCS_rewrite>
+  
+  One realization which helps in this reduction is that if $z subset.eq S union {i_k}$ and $p subset.eq S$ then the maximum change from $f(hat(x)_p)$ to $f(hat(z)_p)$ is the replacement of one feature since the contribution of each feature to the dot product is constant. It is also clear that the distance $d(x,x_j)$ is always the same regardless of $z$ or $p$, and even regardless of whether we are dealing with $S$ or $T$. From this, one can argue that if $S$ is replaced with $T$, then whether $f(hat(x)_p)$ changes is only dependent on if any of the new features has a higher contribution, than any of the $b$ best features in $S$. In the case of $T$, there is a higher probability that there exists $b$ features with higher contribution than $i_k$, than there is in $S$. From this one can argue that:
+  $ max_(u subset S union {i_k}) f(hat(x)_(u)) d(x,x_j) -  &max_(u subset S) f(hat(x)_(u)) d(x,x_j) \ >= max_(u subset T union {i_k}) f(hat(x)_(u)) d(x,x_j) -  &max_(u subset T) f(hat(x)_(u)) d(x,x_j) $<NeCS_sub_1>
+
+  All there is left to argue about is the remaining 2 terms of @NeCS_rewrite. Due to the fact that $d(x,x_j)>=d(x_j,hat(x)_u)$ we can see that maximizing $f(hat(x)_u)d(hat(x)_u,x_j)$ is more important than minimizing the term $-f(hat(x)_u)d(x_j,hat(x)_u)$. Now since replacing $S$ with $T$ results either in a smaller $d(x_j,hat(x)_u)$, or the same if no features from $T$ improves $f(hat(x)_u)$, we have the following:
+
+  $ max_(u subset S union {i_k}) -f(hat(x)_(u))d(x_j,hat(x)_(u))  -  &max_(u subset S) - f(hat(x)_(u))d(x_j,hat(x)_(u)) >= \ max_(u subset T union {i_k}) -f(hat(x)_(u))d(x_j,hat(x)_(u))  -  &max_(u subset T) - f(hat(x)_(u))d(x_j,hat(x)_(u)) $<NeCS_sub_2>
+
+  Now by combining @NeCS_sub_1 and @NeCS_sub_2 we get the following.
+  
+  $ beta(S union {i_k}) - beta(S) >= max_(u subset T union {i_k}) f(hat(x)_(u))& d(x,x_j)  - f(hat(x)_(u))d(x_j,hat(x)_(u)) - \  max_(u subset T) f(hat(x)_(u)) d(x,x_j) - &f(hat(x)_(u))d(x_j,hat(x)_(u)) $  
+  $ = beta(T union {i_k}) - beta(T) $]
 
 With this we can design a method that uses marginal gain in order to pick the best counterfactual in each iteration. Marginal gain is defined as follows:
 $ rho_beta (S, i_k) = beta(S union {i_k}) - beta(S) $<NeCS_mar_gain>
@@ -129,7 +140,7 @@ In @NeCS_obj we used as budget to decide on the maximum amount of features that 
   kind: "algorithm",
   supplement: [Algorithm],
   caption: [Pseudo-code for NeCS],
-  pseudocode-list(booktabs: true, title: [NeCS($x$, target, origin, ${C_0,C_1,dots,C_j}$, predictor)])[
+  pseudocode-list(booktabs: true, title: [K-NeCS($x$, target, origin, ${C_0,C_1,dots,C_j}$, predictor)])[
   + $k_1,k_2,dots,k_k=$ *K-NearestNeighbors*($x,C_t$)
   + cfs = ${}$\
   + *for* k *in* [$k_1,k_2,dots,k_k$]:
@@ -148,7 +159,7 @@ $ [ 1-((K-q)/(K))((K-q-1)/(K-q))^(K-q) ]dot "optimum result" $<nemhauser_eq>
 Where $q$ is the upper limit on the amount of iteration we are willing to brute-force our picks. Meaning that the first $q$ picks in the method are brute-forced instead of using greedy selection, for our purpose we have $q=1$. $K$ is the maximum amount of greedy picks necessary to execute the algorithm. As this value will be different depending on the dataset, we pick an arbitrarily large value ($K=10^6$). Then of pick $beta(S)$ to be our solution and $beta(S_"opt")$ to be the optimal solution, then our approximation ratio becomes. 
 
 $ beta(S) >= 0.63 dot beta(S_"opt") $<NeCS_aprox>
-Since our algorithm is restricted by a budget this approximation ratio is worse than @NeCS_aprox. In order to find the approximation ratio for any solution one must count the amount of steps @NecS_alg takes before terminating, and then using this value as $K$ in @nemhauser_eq. As an example if @NecS_alg terminates in 15 steps, then the approximation ratio becomes $beta(S_15) >= 0.67 dot beta(S_"opt")$ 
+Since our algorithm is restricted by a budget this approximation ratio is worse than @NeCS_aprox. In order to find the approximation ratio for any solution one must count the amount of steps @NecS_alg takes before terminating, and then using this value as $K$ in @nemhauser_eq. As an example if @NecS_alg terminates in 15 steps, then the approximation ratio becomes $beta(S_15) >= 0.67 dot beta(S_"opt")$ #todo[Kinda suspect]
 
-Looking at the time complexity of @NecS_alg there are two parts. Firstly, the K-nearest neighbors method is used, which has time complexity $O(n f)$ where $n$ is the amount of points and $f$ is the amount of features. The next part is where the counterfactuals for each neighbor is generated, which has complexity $O(k f^2)$ where k is the amount of neighbors. This puts the overall time complexity at $O(n f + k f^2)$.
+Looking at the time complexity of @NecS_alg there are two parts. Firstly, the K-nearest neighbors method is used, which has time complexity $O(n f)$#todo[source?] where $n$ is the amount of points and $f$ is the amount of features. The next part is where the counterfactuals for each neighbor is generated, which has complexity $O(k f^2)$ where k is the amount of neighbors. This puts the overall time complexity at $O(n f + k f^2)$.
 

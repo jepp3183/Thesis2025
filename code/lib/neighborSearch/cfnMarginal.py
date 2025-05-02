@@ -59,9 +59,10 @@ def neighborSearchMarginal(
 
         while True:
             max_change = -float('inf')
-            least_change = float('inf')
             max_feature = -1
-            least_feature = -1
+
+            if predictor(cf) == target:
+                break
 
             for f in range(len(neighbor)):
                 if f in changed_features:
@@ -71,22 +72,12 @@ def neighborSearchMarginal(
 
                 score = marginalGain(temp_cf, cf, center_target, center_orgin, instance, dis, neighbor)
                 
-                if predictor(temp_cf) != pred_instance:
-                    if score < least_change:
-                        least_change = score
-                        least_feature = f
-                    continue
-                
                 if score > max_change:
                     max_change = score
                     max_feature = f
 
-            if max_feature == -1:
-                cf[least_feature] = neighbor[least_feature]
-                break
-            else:
-                changed_features.append(max_feature)
-                cf[max_feature] = neighbor[max_feature]
+            changed_features.append(max_feature)
+            cf[max_feature] = neighbor[max_feature]
 
         counterfactuals = np.append(counterfactuals, np.array([cf]), axis=0)
 

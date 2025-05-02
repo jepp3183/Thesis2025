@@ -2,6 +2,8 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+import pandas as pd
 import os, sys
 
 class HiddenPrints:
@@ -35,3 +37,14 @@ def plot_cluster_cf(X, cluster_labels, cf, initial_point_idx):
     plt.ylabel('Feature 2')
     plt.title('Cluster Plot with counterfactuals and Initial Point')
     plt.show()
+
+def load_diabetes():
+    path = "../data/diabetes.xls"
+    df = pd.read_csv(path)
+    X = df.iloc[:, :-1].values
+    y = df.iloc[:, -1].values
+    return X, y
+
+def sparsity_fix(cf: np.ndarray, x: np.ndarray, model: KMeans) -> np.ndarray:
+    pass
+    

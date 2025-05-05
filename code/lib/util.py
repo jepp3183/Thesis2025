@@ -46,5 +46,35 @@ def load_diabetes():
     return X, y
 
 def sparsity_fix(cf: np.ndarray, x: np.ndarray, model: KMeans) -> np.ndarray:
-    pass
-    
+    org_cluster = model.predict(cf)
+    fixed = cf.copy()
+    features = list(range(x.shape[1]))
+
+    print(f"Original counterfactual: {cf}")
+    print(f"instance: {x}")
+    print(f"Original cluster: {org_cluster}")
+
+    while len(features) > 0:
+        costs = np.array([get_reset_cost(fixed, cf, f) for f in features])
+        feature_idx = np.argmin(costs)
+        feature = features[feature_idx]
+
+        value_backup = fixed[:, feature].copy()
+        fixed[:, feature] = x[:, feature]
+
+        print(f"costs: {costs}")
+        print(f"Fixed: {fixed}")
+
+        features.remove(feature)
+
+        if model.predict(fixed) != org_cluster:
+            fixed[:, feature] = value_backup
+            print(f"break with {fixed}")
+            break
+
+    return fixed
+
+def get_reset_cost(fixed: np.ndarray, cf: np.ndarray, feature) -> float:
+    temp = fixed.copy()
+    temp[:, feature] = cf[:, feature]
+    return np.linalg.norm(temp - cf, axis=1).sum()

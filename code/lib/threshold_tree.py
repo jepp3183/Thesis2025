@@ -41,7 +41,7 @@ class ThresholdTree():
         self._RF_instance = None
         self._RF_cf = None
 
-    def find_counterfactuals_random_forest(self, instance, target, threshold_change=0.1, robustness_factor=0.7, n_estimators=2, ratio_of_trees=0.5):
+    def find_counterfactuals_rf(self, instance, target, threshold_change=0.1, robustness_factor=0.7, n_estimators=20, ratio_of_trees=1):
         """
         Find counterfactuals using Random Forest.
 
@@ -63,7 +63,7 @@ class ThresholdTree():
         instance_label = self.model.predict([instance])[0]
         target_point = self.centers[target, :]
         
-        clf = RandomForestClassifier(random_state=42, n_estimators=n_estimators, max_depth=5, min_samples_leaf=1)
+        clf = RandomForestClassifier(random_state=42, n_estimators=n_estimators, max_depth=None, min_samples_leaf=5)
         clf.fit(self.X, self.y)
         print(f"Random Forest accuracy: {clf.score(self.X, self.y)}")
 
@@ -142,11 +142,11 @@ class ThresholdTree():
                 cf[int(uniques[max_count_index][1])] = mean_threshold + threshold_change
                 u_counts[max_count_index] = -1
             else:
-                print("Could not finish counterfactual")
+                # print("Could not finish counterfactual")
                 break
 
-        print("Counterfactual: ", cf)
-        self._RF_cf = cf
+        # print("Counterfactual: ", cf)
+        self._RF_cf = cf.reshape(1, -1)
         return self._RF_cf
     
     def plot_rf_tree(self):

@@ -41,7 +41,13 @@ def run(
 
 
         if len(cf) == 0:
-            results.append([[] for _ in range(len(m))])
+            results.append([
+                [],
+                [],
+                [],
+                cf_validity(cf_original, target, centers),
+                []
+            ])
             continue
 
         if metrics.Similarity in m:
@@ -53,8 +59,7 @@ def run(
         if metrics.Validity in m:
             metric.append(cf_validity(cf_original, target, centers))
         if metrics.Diversity in m:
-            div = cf_diversity(cf)
-            metric.append(div)
+            metric.append(cf_diversity(cf))
 
         results.append(metric)
     return results, returnNames()

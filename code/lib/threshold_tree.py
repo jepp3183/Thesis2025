@@ -1,10 +1,13 @@
 from lib.imm import imm
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 from sklearn import tree
 import seaborn as sns
 import pandas as pd
+import math
+from random import sample
 
 
 
@@ -33,6 +36,148 @@ class ThresholdTree():
         self._IMM_instance = None
         self._IMM_cf = None
         self._IMM_cf_prime = None
+        self._RF_model = None
+        self._RF_trees = None
+        self._RF_instance = None
+        self._RF_cf = None
+
+    def find_counterfactuals_random_forest(self, instance, target, threshold_change=0.1, robustness_factor=0.7, n_estimators=2, ratio_of_trees=0.5):
+        """
+        Find counterfactuals using Random Forest.
+
+        Parameters
+        ----------
+        instance : Data point
+        target : Target label
+        threshold_change : Change from threshold when changing the feature
+        robustness_factor : Factor to increase the robustness of the counterfactual
+        n_estimators : Number of trees in the Random Forest
+        ratio_of_trees : Ratio of trees to use for generating counterfactuals
+
+        Returns
+        -------
+        List of counterfactuals
+        """
+
+        self._RF_instance = instance
+        instance_label = self.model.predict([instance])[0]
+        target_point = self.centers[target, :]
+        
+        clf = RandomForestClassifier(random_state=42, n_estimators=n_estimators, max_depth=5, min_samples_leaf=1)
+        clf.fit(self.X, self.y)
+        print(f"Random Forest accuracy: {clf.score(self.X, self.y)}")
+
+        estimators = clf.estimators_
+        _tree_models = [est.tree_ for est in estimators]
+
+        amount_of_trees = math.ceil(len(_tree_models) * ratio_of_trees)
+
+        chosen_trees = sample(_tree_models, amount_of_trees)
+
+        parents = []
+        target_leafs = []
+        self._RF_model = clf
+        self._RF_trees = chosen_trees
+        features = [tree_model.feature for tree_model in chosen_trees]
+        thresholds = [tree_model.threshold for tree_model in chosen_trees]
+        n_total_nodes = [tree_model.node_count for tree_model in chosen_trees]
+
+        for j, (t_tree_model, t_n_total_nodes) in enumerate(zip(chosen_trees,n_total_nodes)):
+            temp_parent = np.full(t_n_total_nodes, -1, dtype=int)
+            for i in range(t_n_total_nodes):
+                if t_tree_model.children_left[i] != -1:
+                    temp_parent[t_tree_model.children_left[i]] = i
+                if t_tree_model.children_right[i] != -1:
+                    temp_parent[t_tree_model.children_right[i]] = i
+            parents.append(temp_parent)
+            target_leafs.append(np.array([x for x in range(t_n_total_nodes) if t_tree_model.children_left[x] == -1 and np.argmax(t_tree_model.value[x]) == target]))
+
+        inst = np.array([instance])
+        targ = np.array([target_point])
+        inst = inst.astype(np.float32)
+        targ = targ.astype(np.float32)
+
+        node_splits = np.empty(shape=(0, 3)) # For every threshold, we have the feature, threshold value and the path direction
+        
+        for i, (t_tree_model, t_parent, t_target_leafs, t_features, t_threshold, t_n_total_nodes) in enumerate(zip(chosen_trees, parents, target_leafs, features, thresholds, n_total_nodes)):
+            for j, l in enumerate(t_target_leafs):
+                target_node_indicator = np.zeros(shape=(t_n_total_nodes), dtype=int)
+                curr_node = l
+                while t_parent[curr_node] != -1:
+                    target_node_indicator[curr_node] = 1
+                    curr_node = t_parent[curr_node]
+                target_node_indicator[curr_node] = 1
+
+                path = set(np.nonzero(target_node_indicator)[0])
+                curr_node = 0
+                while len(path) > 1:
+                    path.remove(curr_node)
+                    if t_tree_model.children_left[curr_node] in path:
+                        node_splits = np.append(node_splits, [[1,t_features[curr_node],t_threshold[curr_node]]], axis=0)
+                        curr_node = t_tree_model.children_left[curr_node]
+                    elif t_tree_model.children_right[curr_node] in path:
+                        node_splits = np.append(node_splits, [[0,t_features[curr_node],t_threshold[curr_node]]], axis=0)
+                        curr_node = t_tree_model.children_right[curr_node]
+                    elif path == {}:
+                        break
+                    else :
+                        print("CHILD COULD NOT BE LOCATED!!!!!")
+
+        uniques, u_counts = np.unique(node_splits[:,:2], axis=0, return_counts=True)
+
+        cf = instance.copy() # counterfactual
+
+        while clf.predict([cf]) != target:
+            max_count_index = np.argmax(u_counts)
+            if u_counts[max_count_index] == -1:
+                break
+            elif uniques[max_count_index][1] == 1:
+                mean_threshold = np.mean(node_splits[np.all(node_splits[:,:2] == uniques[max_count_index], axis=1)][:,2])
+                # print("mean: ", mean_threshold)
+                cf[int(uniques[max_count_index][1])] = mean_threshold - threshold_change
+                u_counts[max_count_index] = -1
+            elif uniques[max_count_index][1] == 0:
+                mean_threshold = np.mean(node_splits[np.all(node_splits[:,:2] == uniques[max_count_index], axis=1)][:,2])
+                # print("mean: ", mean_threshold)
+                cf[int(uniques[max_count_index][1])] = mean_threshold + threshold_change
+                u_counts[max_count_index] = -1
+            else:
+                print("Could not finish counterfactual")
+                break
+
+        print("Counterfactual: ", cf)
+        self._RF_cf = cf
+        return self._RF_cf
+    
+    def plot_rf_tree(self):
+        """
+        Plot the Random Forest boundaries together with instance and counterfactuals.
+
+        Raises TypeError if the Random Forest tree hasn't been trained.
+        """
+        if self._RF_model is None:
+            raise TypeError("Random Forest tree hasn't been trained.")
+        elif self._RF_instance.shape[0] != 2:
+            raise ValueError("Only 2D data can be plotted.")
+
+        # Assuming imm_model is an instance of the imm class and has been fitted
+        root_node = 0
+
+        # Plot the data points
+        df = pd.DataFrame(self.X, columns=['x1', 'x2'])
+        df['label'] = [f'Cluster {i}' for i in self.y]
+        df = df.sort_values(by='label')
+
+        sns.scatterplot(df, x='x1', y='x2', hue='label', palette="Set2", legend='full')
+        # Plot centroids
+        sns.scatterplot(x=self.centers[:, 0], y=self.centers[:, 1], color='black', s=70, label='Cluster Centers')
+        sns.scatterplot(x=[self._RF_instance[0]], y=[self._RF_instance[1]], color='red', s=120, label='Instance')
+        sns.scatterplot(x=[self._RF_cf[0]], y=[self._RF_cf[1]], color='blue', s=120, label='Counterfactual')
+
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('Random Forest Boundaries with Counterfactuals')
+        plt.show()
 
     def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
         """

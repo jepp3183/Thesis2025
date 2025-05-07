@@ -151,7 +151,7 @@ class ThresholdTree():
     
     def plot_rf_tree(self):
         """
-        Plot the Random Forest boundaries together with instance and counterfactuals.
+        Plot the Random Forest results with instance and counterfactuals.
 
         Raises TypeError if the Random Forest tree hasn't been trained.
         """
@@ -179,7 +179,7 @@ class ThresholdTree():
         plt.title('Random Forest Boundaries with Counterfactuals')
         plt.show()
 
-    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
+    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -199,7 +199,7 @@ class ThresholdTree():
         instance_label = self.model.predict([instance])[0]
         target_point = self.centers[target, :]
         
-        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)
+        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=0, min_samples_leaf=self.X.shape[0] // 20)
         clf.fit(self.X, self.y)
         print(f"DTC accuracy: {clf.score(self.X, self.y)}")
 
@@ -340,7 +340,7 @@ class ThresholdTree():
         Raises TypeError if the Decision Tree Classifier tree hasn't been trained.
         """
         if self._DTC_model is not None:
-            tree.plot_tree(self._DTC_model, proportion=True, node_ids=True, impurity=False)
+            tree.plot_tree(self._DTC_model, proportion=True, node_ids=True, impurity=True)
             # plt.savefig('fig1.png', dpi = 3000) # Save tree for inspection
             plt.show()
         else:

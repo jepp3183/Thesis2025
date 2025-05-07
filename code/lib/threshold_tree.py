@@ -179,7 +179,132 @@ class ThresholdTree():
         plt.title('Random Forest Boundaries with Counterfactuals')
         plt.show()
 
-    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.):
+    def update_tree(self, leaf_index, cut_span_threshold = 1/3):
+        # Create path list for leaf index
+        target_node_indicator = np.zeros(shape=(self._DTC_model.tree_.node_count), dtype=int)
+        curr_node = leaf_index
+        while self.dtc_parent[curr_node] != -1:
+            target_node_indicator[curr_node] = 1
+            curr_node = self.dtc_parent[curr_node]
+        target_node_indicator[curr_node] = 1
+        path = set(np.nonzero(target_node_indicator)[0])
+
+        node_splits = np.empty(shape=(0, 3)) # List of threshold splits on path with evaluation value
+        curr_node = 0
+        while len(path) > 1:
+            path.remove(curr_node)
+            if self._DTC_tree.children_left[curr_node] in path:
+                node_splits = np.append(node_splits, [[1,self._DTC_model.tree_.feature[curr_node],self._DTC_model.tree_.threshold[curr_node]]], axis=0)
+                curr_node = self._DTC_model.tree_.children_left[curr_node]
+            elif self._DTC_tree.children_right[curr_node] in path:
+                node_splits = np.append(node_splits, [[0,self._DTC_model.tree_.feature[curr_node],self._DTC_model.tree_.threshold[curr_node]]], axis=0)
+                curr_node = self._DTC_model.tree_.children_right[curr_node]
+            else:
+                print("CHILD COULD NOT BE LOCATED!!!!!")
+                break
+
+
+
+        n_dims = self.X.shape[1]
+        left_splits = []
+        right_splits = []
+        for i in range(n_dims):
+            list_left = node_splits[np.all(node_splits[:,:2] == np.array([[1,i]]), axis=1)][:,2]
+            list_right = node_splits[np.all(node_splits[:,:2] == np.array([[0,i]]), axis=1)][:,2]
+            left_splits.append(
+                np.min(list_left) if len(list_left) > 0 else None
+            )
+            right_splits.append(
+                np.max(list_right) if len(list_right) > 0 else None
+            )
+
+        min_dimension = np.min(self.X, axis=0)
+        max_dimension = np.max(self.X, axis=0)    
+
+        dim_ranges = list(zip(
+            [md if ls is None else ls for md,ls in zip(min_dimension, left_splits)], 
+            [md if ls is None else ls for md,ls in zip(max_dimension, right_splits)]
+        ))
+
+        leaf_data = self.X[self.sample_leaf_indices == leaf_index]
+        dim_cut_properties = [
+            self.calc_dimension_cut_properties(dim_ranges[d], leaf_data[:, d]) 
+            for d in range(n_dims)
+        ]
+
+        dim_to_cut = -1
+        best_score = 1
+        for i, (score, _, _, _, _) in enumerate(dim_cut_properties):
+            if score < best_score and score <= cut_span_threshold:
+                dim_to_cut = i
+                best_score = score
+        
+        if dim_to_cut == -1: return
+
+        # 
+        _, space_left, space_right, cut_left, cut_right = dim_cut_properties[dim_to_cut]
+        threshold = cut_left if space_left >= space_right else cut_right
+        
+        
+        self._DTC_model.tree_.threshold = np.append(self._DTC_model.tree_.threshold,[-1])
+        self._DTC_model.tree_.threshold.append(-1)
+        self._DTC_model.tree_.threshold[leaf_index] = threshold
+        self._DTC_model.tree_.feature.append(-1)
+        self._DTC_model.tree_.feature.append(-1)
+        self._DTC_model.tree_.feature[leaf_index] = dim_to_cut
+        self._DTC_model.tree_.children_left.append(-1)
+        self._DTC_model.tree_.children_left.append(-1)
+        self._DTC_model.tree_.children_left[leaf_index] = len(self._DTC_model.tree_.threshold) - 1
+        self._DTC_model.tree_.children_right.append(-1)
+        self._DTC_model.tree_.children_right.append(-1)
+        self._DTC_model.tree_.children_right[leaf_index] = len(self._DTC_model.tree_.threshold) - 1 + 1
+        self.dtc_parent.append(leaf_index)
+        self.dtc_parent.append(leaf_index)
+
+        
+    def calc_dimension_cut_properties(self, dim_range_tuple, leaf_data, threshold = 0.95):
+        """
+        For the given dimension range and leaf data, returns the span score, space left, space right, cut left and cut right.
+        The span score is the ratio of the data range to the dimension range.
+        The space left and right are the distances from the data range to the dimension range.
+        The cut left and right are the cuts that can be made.
+
+        Parameters
+        ----------
+        dim_range_tuple : Tuple of min and max values of the dimension range
+        leaf_data : Leaf data
+        threshold : Threshold for the span score
+
+        Returns
+        -------
+        span score, space left, space right, cut left and cut right
+        """
+        if len(leaf_data) <= 10: return [1, 0, 0, 0, 0]
+
+        dim_min, dim_max = dim_range_tuple
+        dim_range = abs(dim_max - dim_min)
+
+        low_idx = 0
+        high_idx = len(leaf_data) - 1
+        while high_idx - low_idx + 1 > len(leaf_data) * threshold:
+            low_idx += 1
+            high_idx -= 1
+
+        leaf_data_sorted = np.sort(leaf_data)
+        data_high = leaf_data_sorted[high_idx]
+        data_low = leaf_data_sorted[low_idx]
+        data_range = abs(data_high - data_low)
+
+        space_left = data_low - dim_min
+        space_right = dim_max - data_high
+
+        cut_left = (leaf_data[low_idx] + leaf_data[low_idx - 1]) / 2
+        cut_right = (leaf_data[high_idx] + leaf_data[high_idx + 1]) / 2
+
+        return data_range / dim_range, space_left, space_right, cut_left, cut_right
+        
+        
+    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -199,7 +324,7 @@ class ThresholdTree():
         instance_label = self.model.predict([instance])[0]
         target_point = self.centers[target, :]
         
-        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=0, min_samples_leaf=self.X.shape[0] // 20)
+        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)#, min_samples_leaf=self.X.shape[0] // 20)
         clf.fit(self.X, self.y)
         print(f"DTC accuracy: {clf.score(self.X, self.y)}")
 
@@ -214,12 +339,19 @@ class ThresholdTree():
         threshold = tree_model.threshold
 
         # Generate parent list for tree
-        parent = np.full(n_total_nodes, -1, dtype=int)
+        self.dtc_parent = np.full(n_total_nodes, -1, dtype=int)
         for i in range(n_total_nodes):
             if tree_model.children_left[i] != -1:
-                parent[tree_model.children_left[i]] = i
+                self.dtc_parent[tree_model.children_left[i]] = i
             if tree_model.children_right[i] != -1:
-                parent[tree_model.children_right[i]] = i
+                self.dtc_parent[tree_model.children_right[i]] = i
+        
+        self.sample_leaf_indices = clf.apply(self.X)
+        leaf_indices = np.array([x for x in range(n_total_nodes) if tree_model.children_left[x] == -1])
+
+        # for leaf in leaf_indices:
+        #     self.update_tree(leaf)
+        self.update_tree(1)
 
         # print("Parent list: ", parent)
         # print(f"Number of leaves: {n_leaves}")
@@ -250,9 +382,9 @@ class ThresholdTree():
             target_node_indicator = np.zeros(shape=(n_total_nodes), dtype=int)
             curr_node = l
             # print("Leaf node: ", curr_node)
-            while parent[curr_node] != -1:
+            while self.dtc_parent[curr_node] != -1:
                 target_node_indicator[curr_node] = 1
-                curr_node = parent[curr_node]
+                curr_node = self.dtc_parent[curr_node]
                 # print("Parent node: ", curr_node)
 
             # inst = np.array([instance])

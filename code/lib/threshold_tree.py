@@ -456,8 +456,15 @@ class ThresholdTree():
         small_leaf_threshold = 5
 
         # Find all leafs that are of the target class 
-        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])
-        target_leafs = target_leafs[self._n_node_samples[target_leafs] > small_leaf_threshold]
+        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target] )
+        # target_leafs = target_leafs[self._n_node_samples[target_leafs] > small_leaf_threshold]
+        # print(self._values[:10])
+        # print("indexing: ", self._values[target_leafs, 0, :])
+        # print(np.max(self._values[target_leafs, 0, :], axis=1))
+
+        print("Before len: ", target_leafs.shape[0])
+        target_leafs = target_leafs[np.max(self._values[target_leafs, 0, :], axis=1) > 0.9]
+        print("After len: ", target_leafs.shape[0])
 
         inst = np.array([instance])
         targ = np.array([target_point])

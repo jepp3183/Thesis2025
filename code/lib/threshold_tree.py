@@ -34,6 +34,7 @@ class ThresholdTree():
         self._children_right = None
         self._parents = None
         self._values = None
+        self._n_node_samples = None
         self._DTC_model = None
         self._DTC_instance = None
         self._DTC_cfs = None
@@ -290,6 +291,9 @@ class ThresholdTree():
             else:
                 label_right.append(label)
                 sample_right.append(sample_index)
+
+        self._n_node_samples = np.append(self._n_node_samples,[len(sample_left)])
+        self._n_node_samples = np.append(self._n_node_samples,[len(sample_right)])
         
         def get_percentage(labels):
             total = len(labels)
@@ -428,6 +432,7 @@ class ThresholdTree():
         self._children_left = clf.tree_.children_left.copy()
         self._children_right = clf.tree_.children_right.copy()
         self._values = clf.tree_.value.copy()
+        self._n_node_samples = clf.tree_.n_node_samples.copy()
 
         # Generate parent list for tree
         self._parents = np.full(self._thresholds.shape[0], -1, dtype=int)
@@ -449,7 +454,7 @@ class ThresholdTree():
         leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
 
         # Find all leafs that are of the target class
-        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])
+        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target and self._n_node_samples[x] > 5])
 
         print("Target leafs: ", target_leafs)
 

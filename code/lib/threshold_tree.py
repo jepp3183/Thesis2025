@@ -8,7 +8,7 @@ import seaborn as sns
 import pandas as pd
 import math
 from random import sample
-
+from collections import Counter
 
 
 class ThresholdTree():
@@ -26,9 +26,15 @@ class ThresholdTree():
         self.centers = c
         self.X = X
         self.y = y
+        self.k = len(c)
         self._dims = len(X[0])
+        self._thresholds = None
+        self._features = None
+        self._children_left = None
+        self._children_right = None
+        self._parents = None
+        self._values = None
         self._DTC_model = None
-        self._DTC_tree = None
         self._DTC_instance = None
         self._DTC_cfs = None
         self._DTC_cfs_prime = None
@@ -179,13 +185,13 @@ class ThresholdTree():
         plt.title('Random Forest Boundaries with Counterfactuals')
         plt.show()
 
-    def update_tree(self, leaf_index, cut_span_threshold = 1/3):
+    def update_tree(self, leaf_index, leaf_sample_list, cut_span_threshold = 0.66):
         # Create path list for leaf index
-        target_node_indicator = np.zeros(shape=(self._DTC_model.tree_.node_count), dtype=int)
+        target_node_indicator = np.zeros(shape=(self._thresholds.shape[0]), dtype=int)
         curr_node = leaf_index
-        while self.dtc_parent[curr_node] != -1:
+        while self._parents[curr_node] != -1:
             target_node_indicator[curr_node] = 1
-            curr_node = self.dtc_parent[curr_node]
+            curr_node = self._parents[curr_node]
         target_node_indicator[curr_node] = 1
         path = set(np.nonzero(target_node_indicator)[0])
 
@@ -193,12 +199,12 @@ class ThresholdTree():
         curr_node = 0
         while len(path) > 1:
             path.remove(curr_node)
-            if self._DTC_tree.children_left[curr_node] in path:
-                node_splits = np.append(node_splits, [[1,self._DTC_model.tree_.feature[curr_node],self._DTC_model.tree_.threshold[curr_node]]], axis=0)
-                curr_node = self._DTC_model.tree_.children_left[curr_node]
-            elif self._DTC_tree.children_right[curr_node] in path:
-                node_splits = np.append(node_splits, [[0,self._DTC_model.tree_.feature[curr_node],self._DTC_model.tree_.threshold[curr_node]]], axis=0)
-                curr_node = self._DTC_model.tree_.children_right[curr_node]
+            if self._children_left[curr_node] in path:
+                node_splits = np.append(node_splits, [[1,self._features[curr_node],self._thresholds[curr_node]]], axis=0)
+                curr_node = self._children_left[curr_node]
+            elif self._children_right[curr_node] in path:
+                node_splits = np.append(node_splits, [[0,self._features[curr_node],self._thresholds[curr_node]]], axis=0)
+                curr_node = self._children_right[curr_node]
             else:
                 print("CHILD COULD NOT BE LOCATED!!!!!")
                 break
@@ -222,11 +228,13 @@ class ThresholdTree():
         max_dimension = np.max(self.X, axis=0)    
 
         dim_ranges = list(zip(
-            [md if ls is None else ls for md,ls in zip(min_dimension, left_splits)], 
-            [md if ls is None else ls for md,ls in zip(max_dimension, right_splits)]
+            [md if ls is None else ls for md,ls in zip(max_dimension, left_splits)], 
+            [md if rs is None else rs for md,rs in zip(min_dimension, right_splits)]
         ))
+        # print(f"All dim ranges: {dim_ranges}")
 
-        leaf_data = self.X[self.sample_leaf_indices == leaf_index]
+        leaf_data = np.take(self.X, leaf_sample_list, axis=0)
+        # leaf_data = self.X[self.sample_leaf_indices == leaf_index]
         dim_cut_properties = [
             self.calc_dimension_cut_properties(dim_ranges[d], leaf_data[:, d]) 
             for d in range(n_dims)
@@ -234,33 +242,87 @@ class ThresholdTree():
 
         dim_to_cut = -1
         best_score = 1
-        for i, (score, _, _, _, _) in enumerate(dim_cut_properties):
-            if score < best_score and score <= cut_span_threshold:
+        for i, res in enumerate(dim_cut_properties):
+            if res == None: continue # None means bad cut
+            if res[0] < best_score and res[0] <= cut_span_threshold:
                 dim_to_cut = i
-                best_score = score
+                best_score = res[0]
         
         if dim_to_cut == -1: return
 
-        # 
+        
         _, space_left, space_right, cut_left, cut_right = dim_cut_properties[dim_to_cut]
         threshold = cut_left if space_left >= space_right else cut_right
         
         
-        self._DTC_model.tree_.threshold = np.append(self._DTC_model.tree_.threshold,[-1])
-        self._DTC_model.tree_.threshold.append(-1)
-        self._DTC_model.tree_.threshold[leaf_index] = threshold
-        self._DTC_model.tree_.feature.append(-1)
-        self._DTC_model.tree_.feature.append(-1)
-        self._DTC_model.tree_.feature[leaf_index] = dim_to_cut
-        self._DTC_model.tree_.children_left.append(-1)
-        self._DTC_model.tree_.children_left.append(-1)
-        self._DTC_model.tree_.children_left[leaf_index] = len(self._DTC_model.tree_.threshold) - 1
-        self._DTC_model.tree_.children_right.append(-1)
-        self._DTC_model.tree_.children_right.append(-1)
-        self._DTC_model.tree_.children_right[leaf_index] = len(self._DTC_model.tree_.threshold) - 1 + 1
-        self.dtc_parent.append(leaf_index)
-        self.dtc_parent.append(leaf_index)
+        self._thresholds = np.append(self._thresholds,[-1])
+        self._thresholds = np.append(self._thresholds,[-1])
+        self._thresholds[leaf_index] = threshold
+        
+        self._features = np.append(self._features,[-1])
+        self._features = np.append(self._features,[-1])
+        self._features[leaf_index] = dim_to_cut
+        
+        self._children_left = np.append(self._children_left,[-1])
+        self._children_left = np.append(self._children_left,[-1])
+        left_leaf_index = len(self._thresholds) - 2
+        self._children_left[leaf_index] = left_leaf_index
+        
+        self._children_right = np.append(self._children_right,[-1])
+        self._children_right = np.append(self._children_right,[-1])
+        right_leaf_index = len(self._thresholds) - 2 + 1
+        self._children_right[leaf_index] = right_leaf_index
+        
+        self._parents = np.append(self._parents,[leaf_index])
+        self._parents = np.append(self._parents,[leaf_index])
 
+        label_left = []
+        label_right = []
+        
+        sample_left = []
+        sample_right = []
+
+        for sample_index in leaf_sample_list:
+            label = self.y[sample_index]
+            if self.X[sample_index][dim_to_cut] <= threshold:
+                label_left.append(label)
+                sample_left.append(sample_index)
+            else:
+                label_right.append(label)
+                sample_right.append(sample_index)
+        
+        def get_percentage(labels):
+            total = len(labels)
+            amount = Counter(labels)
+
+            return np.array([[[ (amount.get(i, 0) / total) for i in range(self.k) ]]])
+        
+        self._values = np.append(self._values, get_percentage(label_left), axis=0) 
+        self._values = np.append(self._values, get_percentage(label_right), axis=0)
+        
+        self.update_tree(left_leaf_index, sample_left)
+        self.update_tree(right_leaf_index, sample_right)
+
+    def predict(self, data_points):
+        
+        def recursive_predict(node, data_point):
+            if self._children_left[node] == -1:
+                value = self._values[node][0]
+                return np.argmax(value)
+            
+            threshold = self._thresholds[node]
+            feature = self._features[node]
+
+            if data_point[feature] <= threshold:
+                return recursive_predict(self._children_left[node], data_point)
+            else:
+                return recursive_predict(self._children_right[node], data_point)
+        
+        results = []
+        for point in data_points:
+            results.append(recursive_predict(0,point))
+
+        return results
         
     def calc_dimension_cut_properties(self, dim_range_tuple, leaf_data, threshold = 0.95):
         """
@@ -279,7 +341,9 @@ class ThresholdTree():
         -------
         span score, space left, space right, cut left and cut right
         """
-        if len(leaf_data) <= 10: return [1, 0, 0, 0, 0]
+        _, counts = np.unique(self.y, return_counts=True)
+        smallest_cluster_size = np.min(counts)
+        if len(leaf_data) <= smallest_cluster_size // 2: return None
 
         dim_min, dim_max = dim_range_tuple
         dim_range = abs(dim_max - dim_min)
@@ -297,12 +361,42 @@ class ThresholdTree():
 
         space_left = data_low - dim_min
         space_right = dim_max - data_high
+        # print(f"data_low {data_low}, dim_min {dim_min}, dim_max {dim_max}, data_high {data_high}")
+        # print("")
 
-        cut_left = (leaf_data[low_idx] + leaf_data[low_idx - 1]) / 2
-        cut_right = (leaf_data[high_idx] + leaf_data[high_idx + 1]) / 2
+        cut_left = (leaf_data_sorted[low_idx] + leaf_data_sorted[low_idx - 1]) / 2
+        cut_right = (leaf_data_sorted[high_idx] + leaf_data_sorted[high_idx + 1]) / 2
 
-        return data_range / dim_range, space_left, space_right, cut_left, cut_right
-        
+        # print(f"Dim range: {dim_range}, data range: {data_range}, low_idx: {low_idx}, high_idx: {high_idx}")
+        # print("")
+
+        # print(f"Data range: {data_range}, dim_range: {dim_range}")
+        span_score = data_range / dim_range
+
+        return span_score, space_left, space_right, cut_left, cut_right
+    
+    def calc_node_indicator(self, data_point):  
+        """
+        Calculate the node indicator for the given data point.
+
+        Parameters
+        ----------
+        data_point : Data point
+
+        Returns
+        -------
+        Node indicator - 0/1 encoding for visited nodes on path to leaf
+        """
+        node_indicator = np.zeros(shape=(self._thresholds.shape[0]), dtype=int)
+        curr_node = 0
+        node_indicator[curr_node] = 1
+        while self._children_left[curr_node] != -1:
+            if data_point[self._features[curr_node]] <= self._thresholds[curr_node]:
+                curr_node = self._children_left[curr_node]
+            elif data_point[self._features[curr_node]] > self._thresholds[curr_node]:
+                curr_node = self._children_right[curr_node]
+            node_indicator[curr_node] = 1
+        return node_indicator
         
     def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
         """
@@ -328,85 +422,66 @@ class ThresholdTree():
         clf.fit(self.X, self.y)
         print(f"DTC accuracy: {clf.score(self.X, self.y)}")
 
-        n_leaves = clf.get_n_leaves()
-        n_total_nodes = clf.tree_.node_count
-        n_internal_nodes = n_total_nodes - n_leaves
-
-        tree_model = clf.tree_
         self._DTC_model = clf
-        self._DTC_tree = tree_model
-        feature = tree_model.feature
-        threshold = tree_model.threshold
+        self._thresholds = clf.tree_.threshold.copy()
+        self._features = clf.tree_.feature.copy()
+        self._children_left = clf.tree_.children_left.copy()
+        self._children_right = clf.tree_.children_right.copy()
+        self._values = clf.tree_.value.copy()
 
         # Generate parent list for tree
-        self.dtc_parent = np.full(n_total_nodes, -1, dtype=int)
-        for i in range(n_total_nodes):
-            if tree_model.children_left[i] != -1:
-                self.dtc_parent[tree_model.children_left[i]] = i
-            if tree_model.children_right[i] != -1:
-                self.dtc_parent[tree_model.children_right[i]] = i
+        self._parents = np.full(self._thresholds.shape[0], -1, dtype=int)
+        for i in range(self._thresholds.shape[0]):
+            if self._children_left[i] != -1:
+                self._parents[self._children_left[i]] = i
+            if self._children_right[i] != -1:
+                self._parents[self._children_right[i]] = i
         
-        self.sample_leaf_indices = clf.apply(self.X)
-        leaf_indices = np.array([x for x in range(n_total_nodes) if tree_model.children_left[x] == -1])
+        sample_leaf_indices = clf.apply(self.X)
+        leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
+        leaf_sample_lists = [[i for i in range(sample_leaf_indices.shape[0]) if sample_leaf_indices[i] == leaf_indices[j]] for j in range(clf.get_n_leaves())]
+    
+        print("Leaf indices: ", leaf_indices)
+        for i,j in enumerate(leaf_indices):
+            self.update_tree(j,leaf_sample_lists[i])
 
-        # for leaf in leaf_indices:
-        #     self.update_tree(leaf)
-        self.update_tree(1)
 
-        # print("Parent list: ", parent)
-        # print(f"Number of leaves: {n_leaves}")
-        # print(f"Number of nodes: {n_total_nodes}")
-        # print(f"Number of internal nodes: {n_internal_nodes}")
+        leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
 
         # Find all leafs that are of the target class
-        target_leafs = np.array([x for x in range(n_total_nodes) if tree_model.children_left[x] == -1 and np.argmax(tree_model.value[x]) == target])
-        # print("Leaf Ids for target class: ", target_leafs)
-        # print(f"Instance class: {instance_label}, point: {instance}")
-        # print(f"Target center class: {target}, point: {target_point}")
+        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])
+
+        print("Target leafs: ", target_leafs)
 
         inst = np.array([instance])
         targ = np.array([target_point])
         inst = inst.astype(np.float32)
         targ = targ.astype(np.float32)
-        inst_leaf_id = tree_model.apply(inst)
 
         cfs = np.zeros(shape=(target_leafs.shape[0], self._dims))
         cfs_prime = np.zeros(shape=(target_leafs.shape[0], self._dims))
 
 
         for j,l in enumerate(target_leafs):
-            # print("Instance ID: ", inst_leaf_id)
-            # print("Target node ID: ", l)
-            # print("parent list: ", parent)
 
-            target_node_indicator = np.zeros(shape=(n_total_nodes), dtype=int)
+            target_node_indicator = np.zeros(shape=(self._thresholds.shape[0]), dtype=int)
             curr_node = l
-            # print("Leaf node: ", curr_node)
-            while self.dtc_parent[curr_node] != -1:
+            while self._parents[curr_node] != -1:
                 target_node_indicator[curr_node] = 1
-                curr_node = self.dtc_parent[curr_node]
-                # print("Parent node: ", curr_node)
+                curr_node = self._parents[curr_node]
 
-            # inst = np.array([instance])
-            # inst = inst.astype(np.float32)
             target_node_indicator[curr_node] = 1
-            inst_node_indicator = np.array(tree_model.decision_path(inst).todense())[0]
+            inst_node_indicator = self.calc_node_indicator(instance)
 
 
             path_len = min(inst_node_indicator.shape[0], target_node_indicator.shape[0])
             path_equality = inst_node_indicator[:path_len] & target_node_indicator[:path_len]
             last_equal_parent = np.nonzero(path_equality)[0].max()
-            # print("Index in tree of parent equality: ", last_equal_parent)
 
             temp = np.nonzero(target_node_indicator)[0]
             temp = temp[temp >= last_equal_parent]
 
             path_of_changes = set(temp)
-
-            # print("-----------------------------------------------------------------------------------------")
-            # print("Instance path: ", inst_node_indicator)
-            # print("Target path: ", target_node_indicator)
-            # print("Path of changes: ", path_of_changes)
 
             cf = instance.copy() # counterfactual
 
@@ -415,16 +490,16 @@ class ThresholdTree():
             while len(path_of_changes) > 1:
                 # print("  CF:  ", cf)
                 path_of_changes.remove(curr_node)
-                if tree_model.children_left[curr_node] in path_of_changes:
+                if self._children_left[curr_node] in path_of_changes:
                     # print(f"Change {i}: Left child")
-                    if cf[feature[curr_node]] >= threshold[curr_node]:
-                        cf[feature[curr_node]] = threshold[curr_node] - threshold_change
-                    curr_node = tree_model.children_left[curr_node]
-                elif tree_model.children_right[curr_node] in path_of_changes:
+                    if cf[self._features[curr_node]] >= self._thresholds[curr_node]:
+                        cf[self._features[curr_node]] = self._thresholds[curr_node] - threshold_change
+                    curr_node = self._children_left[curr_node]
+                elif self._children_right[curr_node] in path_of_changes:
                     # print(f"Change {i}: Right child")
-                    if cf[feature[curr_node]] < threshold[curr_node]:
-                        cf[feature[curr_node]] = threshold[curr_node] + threshold_change
-                    curr_node = tree_model.children_right[curr_node]
+                    if cf[self._features[curr_node]] < self._thresholds[curr_node]:
+                        cf[self._features[curr_node]] = self._thresholds[curr_node] + threshold_change
+                    curr_node = self._children_right[curr_node]
                 else:
                     print("CHILD COULD NOT BE LOCATED!!!!!")
                     break
@@ -432,13 +507,11 @@ class ThresholdTree():
 
             # print("  CF:  ", cf)
             # print("")
-            assert clf.predict([cf]) == target
+            # assert clf.predict([cf]) == target
             cf = np.array(cf)
             cf = cf.astype(np.float32)
             change = cf - instance
             change[np.isclose(change, 0, atol=0.00001)] = 0
-            # print(f"Counterfactual change: {change}")
-            # print(f"Counterfactual Tree index: {tree_model.apply(np.array([cf]))}")
 
             cfs_prime[j] = cf
             for i in range(self._dims):
@@ -446,8 +519,8 @@ class ThresholdTree():
                     change_prime = instance[i] + change[i] + ((target_point[i] - cf[i]) * robustness_factor)
                     temp_cf = cfs_prime[j].copy()
                     temp_cf[i] = change_prime
-                    # print(f"Pred: ", clf.predict([temp_cf2]))
-                    if clf.predict([temp_cf]) == target:
+                    # if clf.predict([temp_cf]) == target:
+                    if self.predict([temp_cf])[0] == target:
                         cfs_prime[j][i] = change_prime
             # print("-----------------------------------------------------------------------------------------")
             cfs[j] = cf
@@ -485,14 +558,14 @@ class ThresholdTree():
         if node == -1:
             return
         
-        if self._DTC_tree.feature[node] == 0:
-            plt.plot([self._DTC_tree.threshold[node], self._DTC_tree.threshold[node]], [y_min, y_max], 'k-', lw=1)
-            self._dtc_plot_decision_boundaries(self._DTC_tree.children_left[node], x_min, self._DTC_tree.threshold[node], y_min, y_max, depth + 1)
-            self._dtc_plot_decision_boundaries(self._DTC_tree.children_right[node], self._DTC_tree.threshold[node], x_max, y_min, y_max, depth + 1)
-        elif self._DTC_tree.feature[node] == 1:
-            plt.plot([x_min, x_max], [self._DTC_tree.threshold[node], self._DTC_tree.threshold[node]], 'k-', lw=1)
-            self._dtc_plot_decision_boundaries(self._DTC_tree.children_left[node], x_min, x_max, y_min, self._DTC_tree.threshold[node], depth + 1)
-            self._dtc_plot_decision_boundaries(self._DTC_tree.children_right[node], x_min, x_max, self._DTC_tree.threshold[node], y_max, depth + 1)
+        if self._features[node] == 0:
+            plt.plot([self._thresholds[node], self._thresholds[node]], [y_min, y_max], 'k-', lw=1)
+            self._dtc_plot_decision_boundaries(self._children_left[node], x_min, self._thresholds[node], y_min, y_max, depth + 1)
+            self._dtc_plot_decision_boundaries(self._children_right[node], self._thresholds[node], x_max, y_min, y_max, depth + 1)
+        elif self._features[node] == 1:
+            plt.plot([x_min, x_max], [self._thresholds[node], self._thresholds[node]], 'k-', lw=1)
+            self._dtc_plot_decision_boundaries(self._children_left[node], x_min, x_max, y_min, self._thresholds[node], depth + 1)
+            self._dtc_plot_decision_boundaries(self._children_right[node], x_min, x_max, self._thresholds[node], y_max, depth + 1)
 
     def plot_dtc_tree(self):
         """
@@ -586,12 +659,6 @@ class ThresholdTree():
                 else:
                     print("can't change")
 
-        # print("Instance: ", instance)
-        # print("Counterfactual: ", cf)
-        # print("Counterfactual': ", cf_prime)
-        # print("")
-        # print("Original class: ", imm_model.predict(instance))
-        # print("Counterfactual class: ", imm_model.predict(cf))
         self._IMM_instance = instance
         self._IMM_cf = cf
         self._IMM_cf_prime = cf_prime

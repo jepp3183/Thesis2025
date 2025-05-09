@@ -446,17 +446,18 @@ class ThresholdTree():
         leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
         leaf_sample_lists = [[i for i in range(sample_leaf_indices.shape[0]) if sample_leaf_indices[i] == leaf_indices[j]] for j in range(clf.get_n_leaves())]
     
-        print("Leaf indices: ", leaf_indices)
         for i,j in enumerate(leaf_indices):
             self.update_tree(j,leaf_sample_lists[i])
 
-
         leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
 
-        # Find all leafs that are of the target class
-        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target and self._n_node_samples[x] > 5])
+        _, counts = np.unique(self.y, return_counts=True)
+        smallest_cluster_size = np.min(counts)
+        small_leaf_threshold = 5
 
-        print("Target leafs: ", target_leafs)
+        # Find all leafs that are of the target class 
+        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])
+        target_leafs = target_leafs[self._n_node_samples[target_leafs] > small_leaf_threshold]
 
         inst = np.array([instance])
         targ = np.array([target_point])
@@ -512,7 +513,7 @@ class ThresholdTree():
 
             # print("  CF:  ", cf)
             # print("")
-            # assert clf.predict([cf]) == target
+            # assert self.predict([cf]) == target
             cf = np.array(cf)
             cf = cf.astype(np.float32)
             change = cf - instance

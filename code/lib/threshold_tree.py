@@ -462,9 +462,9 @@ class ThresholdTree():
         # print("indexing: ", self._values[target_leafs, 0, :])
         # print(np.max(self._values[target_leafs, 0, :], axis=1))
 
-        print("Before len: ", target_leafs.shape[0])
-        target_leafs = target_leafs[np.max(self._values[target_leafs, 0, :], axis=1) > 0.9]
-        print("After len: ", target_leafs.shape[0])
+        # print("Before len: ", target_leafs.shape[0])
+        # target_leafs = target_leafs[np.max(self._values[target_leafs, 0, :], axis=1) > 0.9]
+        # print("After len: ", target_leafs.shape[0])
 
         inst = np.array([instance])
         targ = np.array([target_point])

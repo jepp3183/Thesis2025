@@ -66,8 +66,6 @@ class ThresholdTree():
         """
 
         self._RF_instance = instance
-        instance_label = self.model.predict([instance])[0]
-        target_point = self.centers[target, :]
         
         clf = RandomForestClassifier(random_state=42, n_estimators=n_estimators, max_depth=None, min_samples_leaf=5)
         clf.fit(self.X, self.y)
@@ -97,11 +95,6 @@ class ThresholdTree():
                     temp_parent[t_tree_model.children_right[i]] = i
             parents.append(temp_parent)
             target_leafs.append(np.array([x for x in range(t_n_total_nodes) if t_tree_model.children_left[x] == -1 and np.argmax(t_tree_model.value[x]) == target]))
-
-        inst = np.array([instance])
-        targ = np.array([target_point])
-        inst = inst.astype(np.float32)
-        targ = targ.astype(np.float32)
 
         node_splits = np.empty(shape=(0, 3)) # For every threshold, we have the feature, threshold value and the path direction
         
@@ -139,19 +132,15 @@ class ThresholdTree():
                 break
             elif uniques[max_count_index][1] == 1:
                 mean_threshold = np.mean(node_splits[np.all(node_splits[:,:2] == uniques[max_count_index], axis=1)][:,2])
-                # print("mean: ", mean_threshold)
                 cf[int(uniques[max_count_index][1])] = mean_threshold - threshold_change
                 u_counts[max_count_index] = -1
             elif uniques[max_count_index][1] == 0:
                 mean_threshold = np.mean(node_splits[np.all(node_splits[:,:2] == uniques[max_count_index], axis=1)][:,2])
-                # print("mean: ", mean_threshold)
                 cf[int(uniques[max_count_index][1])] = mean_threshold + threshold_change
                 u_counts[max_count_index] = -1
             else:
-                # print("Could not finish counterfactual")
                 break
 
-        # print("Counterfactual: ", cf)
         self._RF_cf = cf.reshape(1, -1)
         return self._RF_cf
     
@@ -231,10 +220,8 @@ class ThresholdTree():
             [md if ls is None else ls for md,ls in zip(max_dimension, left_splits)], 
             [md if rs is None else rs for md,rs in zip(min_dimension, right_splits)]
         ))
-        # print(f"All dim ranges: {dim_ranges}")
 
         leaf_data = np.take(self.X, leaf_sample_list, axis=0)
-        # leaf_data = self.X[self.sample_leaf_indices == leaf_index]
         dim_cut_properties = [
             self.calc_dimension_cut_properties(dim_ranges[d], leaf_data[:, d]) 
             for d in range(n_dims)
@@ -364,16 +351,10 @@ class ThresholdTree():
 
         space_left = data_low - dim_min
         space_right = dim_max - data_high
-        # print(f"data_low {data_low}, dim_min {dim_min}, dim_max {dim_max}, data_high {data_high}")
-        # print("")
 
         cut_left = (leaf_data_sorted[low_idx] + leaf_data_sorted[low_idx - 1]) / 2
         cut_right = (leaf_data_sorted[high_idx] + leaf_data_sorted[high_idx + 1]) / 2
 
-        # print(f"Dim range: {dim_range}, data range: {data_range}, low_idx: {low_idx}, high_idx: {high_idx}")
-        # print("")
-
-        # print(f"Data range: {data_range}, dim_range: {dim_range}")
         span_score = data_range / dim_range
 
         return span_score, space_left, space_right, cut_left, cut_right
@@ -399,9 +380,71 @@ class ThresholdTree():
             elif data_point[self._features[curr_node]] > self._thresholds[curr_node]:
                 curr_node = self._children_right[curr_node]
             node_indicator[curr_node] = 1
-        return node_indicator
-        
-    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, min_impurity_decrease=0.001):
+        return node_indicator 
+
+    def find_leaf_centers_dtc(self, target_leafs):
+        """
+        Find the centers of the target leafs.
+
+        Parameters
+        ----------
+        target_leafs : Target leafs to find centers for
+
+        Returns
+        -------
+        Centers of the target leafs
+        """
+        centers = np.zeros(shape=(target_leafs.shape[0], self._dims))
+
+        for k, l in enumerate(target_leafs):
+            target_node_indicator = np.zeros(shape=(self._thresholds.shape[0]), dtype=int)
+            curr_node = l
+            while self._parents[curr_node] != -1:
+                target_node_indicator[curr_node] = 1
+                curr_node = self._parents[curr_node]
+            target_node_indicator[curr_node] = 1
+            path = set(np.nonzero(target_node_indicator)[0])
+
+            node_splits = np.empty(shape=(0, 3)) # List of threshold splits on path with evaluation value
+            curr_node = 0
+            while len(path) > 1:
+                path.remove(curr_node)
+                if self._children_left[curr_node] in path:
+                    node_splits = np.append(node_splits, [[1,self._features[curr_node],self._thresholds[curr_node]]], axis=0)
+                    curr_node = self._children_left[curr_node]
+                elif self._children_right[curr_node] in path:
+                    node_splits = np.append(node_splits, [[0,self._features[curr_node],self._thresholds[curr_node]]], axis=0)
+                    curr_node = self._children_right[curr_node]
+                else:
+                    print("CHILD COULD NOT BE LOCATED!!!!!")
+                    break
+
+            n_dims = self.X.shape[1]
+            left_splits = []
+            right_splits = []
+            for i in range(n_dims):
+                list_left = node_splits[np.all(node_splits[:,:2] == np.array([[1,i]]), axis=1)][:,2]
+                list_right = node_splits[np.all(node_splits[:,:2] == np.array([[0,i]]), axis=1)][:,2]
+                left_splits.append(
+                    np.min(list_left) if len(list_left) > 0 else None
+                )
+                right_splits.append(
+                    np.max(list_right) if len(list_right) > 0 else None
+                )
+
+            min_dimension = np.min(self.X, axis=0)
+            max_dimension = np.max(self.X, axis=0)    
+
+            dim_ranges = list(zip(
+                [md if ls is None else ls for md,ls in zip(max_dimension, left_splits)], 
+                [md if rs is None else rs for md,rs in zip(min_dimension, right_splits)]
+            ))
+            center = np.array([(left + right) / 2 for left, right in dim_ranges])
+            centers[k] = center
+
+        return centers
+
+    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, min_impurity_decrease=0.001, improve_tree_fidelity=True, filter_target_leafs=True):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -411,14 +454,14 @@ class ThresholdTree():
         target : Target label
         threshold_change : Change from threshold when changing the feature
         min_impurity_decrease : Minimum impurity decrease to split a node using DTC
+        improve_tree_fidelity : Whether to improve tree fidelity by recursively splitting leafs
+        filter_target_leafs : Whether to filter target leafs based on the model prediction of the leaf centers
 
         Returns
         -------
         List of counterfactuals
         """
 
-        target_point = self.centers[target, :]
-        
         clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)#, min_samples_leaf=self.X.shape[0] // 20)
         clf.fit(self.X, self.y)
         print(f"DTC accuracy: {clf.score(self.X, self.y)}")
@@ -443,31 +486,18 @@ class ThresholdTree():
         leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
         leaf_sample_lists = [[i for i in range(sample_leaf_indices.shape[0]) if sample_leaf_indices[i] == leaf_indices[j]] for j in range(clf.get_n_leaves())]
     
-        for i,j in enumerate(leaf_indices):
-            self.update_tree(j,leaf_sample_lists[i])
-
-        leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
-
-        _, counts = np.unique(self.y, return_counts=True)
-        smallest_cluster_size = np.min(counts)
-        small_leaf_threshold = 5
+        if improve_tree_fidelity:
+            for i,j in enumerate(leaf_indices):
+                self.update_tree(j,leaf_sample_lists[i])
 
         # Find all leafs that are of the target class 
-        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target] )
-        # target_leafs = target_leafs[self._n_node_samples[target_leafs] > small_leaf_threshold]
-        # print(self._values[:10])
-        # print("indexing: ", self._values[target_leafs, 0, :])
-        # print(np.max(self._values[target_leafs, 0, :], axis=1))
+        target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])
 
-        # print("Before len: ", target_leafs.shape[0])
-        # target_leafs = target_leafs[np.max(self._values[target_leafs, 0, :], axis=1) > 0.9]
-        # print("After len: ", target_leafs.shape[0])
-
-        inst = np.array([instance])
-        targ = np.array([target_point])
-        inst = inst.astype(np.float32)
-        targ = targ.astype(np.float32)
-
+        # Filter found target leafs based on clustering membership of the leaf centers
+        if filter_target_leafs:
+            leaf_centers = self.find_leaf_centers_dtc(target_leafs)
+            target_leafs = target_leafs[self.model.predict(leaf_centers) == target]
+        
         cfs = np.zeros(shape=(target_leafs.shape[0], self._dims))
 
 
@@ -497,15 +527,12 @@ class ThresholdTree():
             curr_node = last_equal_parent
             i = 0
             while len(path_of_changes) > 1:
-                # print("  CF:  ", cf)
                 path_of_changes.remove(curr_node)
                 if self._children_left[curr_node] in path_of_changes:
-                    # print(f"Change {i}: Left child")
                     if cf[self._features[curr_node]] >= self._thresholds[curr_node]:
                         cf[self._features[curr_node]] = self._thresholds[curr_node] - threshold_change
                     curr_node = self._children_left[curr_node]
                 elif self._children_right[curr_node] in path_of_changes:
-                    # print(f"Change {i}: Right child")
                     if cf[self._features[curr_node]] < self._thresholds[curr_node]:
                         cf[self._features[curr_node]] = self._thresholds[curr_node] + threshold_change
                     curr_node = self._children_right[curr_node]
@@ -514,21 +541,10 @@ class ThresholdTree():
                     break
                 i += 1
 
-            # print("  CF:  ", cf)
-            # print("")
-            # assert self.predict([cf]) == target
             cf = np.array(cf)
             cf = cf.astype(np.float32)
             cfs[j] = cf
 
-        # print("Instance: ")
-        # print(instance)
-        # print("Counterfactuals: ")
-        # print(cfs)
-        # print("Counterfactuals': ")
-        # print(cfs_prime)
-        # print("")
-        # all_cfs = np.concatenate((cfs, cfs_prime), axis=0)
         self._DTC_instance = instance
         self._DTC_cfs = cfs
         return cfs 
@@ -646,20 +662,15 @@ class ThresholdTree():
 
         instance_path = imm_model.get_path(instance)
         target_path = imm_model.get_path(target_point)
-        # print(f"Instance path: {instance_path}")
-        # print(f"Target path: {target_path}\n")
 
         path_len = min(len(instance_path), len(target_path))
         path_equality = instance_path[:path_len] == target_path[:path_len]
         last_equal_parent = np.nonzero(path_equality)[0].max()
-        # print("Index in tree of parent equality: ", last_equal_parent)
         path_of_changes = target_path[last_equal_parent:]
-        # print("Path of changes: ", path_of_changes)
 
         cf = instance.copy()
 
         for i in range(len(path_of_changes) - 1):
-            # print(f"Change {i}:")
             curr_node = path_of_changes[i]
             if curr_node.left == path_of_changes[i+1]:
                 if cf[curr_node.feature] >= curr_node.threshold:

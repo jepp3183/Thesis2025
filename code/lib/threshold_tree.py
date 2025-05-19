@@ -417,7 +417,6 @@ class ThresholdTree():
         List of counterfactuals
         """
 
-        instance_label = self.model.predict([instance])[0]
         target_point = self.centers[target, :]
         
         clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)#, min_samples_leaf=self.X.shape[0] // 20)

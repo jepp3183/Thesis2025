@@ -2,6 +2,7 @@ import numpy as np
 from lib.eval.tools import euclid_dis
 from lib.eval.tools import center_prediction
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.cluster import KMeans
 import random
 
 def cf_similarity(cf, instance, dis = euclid_dis) -> float:
@@ -49,3 +50,26 @@ def cf_diversity(cf, per=0.05, dis = euclid_dis):
         m[i,i] += random.uniform(per,per*2)
 
     return np.linalg.det(m)
+
+def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_state=None, return_kmeans=False):
+    assert len(cf.shape) == 2
+
+    kmeans_list = []
+
+    result = np.zeros(len(cf))
+    for i in range(len(cf)):
+        cf_temp = cf[i]
+
+        new_kmeans = KMeans(n_clusters=len(centers), init=centers, random_state=random_state, n_init=1)
+        new_X = X.copy()
+        new_X[instance] = cf_temp
+        new_kmeans.fit(new_X)
+        new_centers = new_kmeans.cluster_centers_
+
+        if return_kmeans:
+            kmeans_list.append(new_kmeans)   
+        formated_cf = np.array([cf_temp])
+        result[i] = cf_validity(formated_cf, target, new_centers)
+    if return_kmeans:
+        return result, kmeans_list
+    return result

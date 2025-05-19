@@ -7,7 +7,8 @@ class metrics(Enum):
     Minimality = 1,
     Plausibility = 2,
     Validity = 3,
-    Diversity = 4
+    Diversity = 4,
+    Invalidation = 5
     
 def run(
         method, 
@@ -60,9 +61,12 @@ def run(
             metric.append(cf_validity(cf_original, target, centers))
         if metrics.Diversity in m:
             metric.append(cf_diversity(cf))
+        if metrics.Invalidation in m:
+            metric.append(cf_counterfactual_invalidation(cf, X, instance, centers, target))
+        
 
         results.append(metric)
     return results, returnNames()
 
 def returnNames():
-    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity"]
+    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation"]

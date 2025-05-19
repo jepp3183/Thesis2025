@@ -48,7 +48,7 @@ class ThresholdTree():
         self._RF_instance = None
         self._RF_cf = None
 
-    def find_counterfactuals_rf(self, instance, target, threshold_change=0.1, robustness_factor=0.7, n_estimators=20, ratio_of_trees=1):
+    def find_counterfactuals_rf(self, instance, target, threshold_change=0.1, n_estimators=20, ratio_of_trees=1):
         """
         Find counterfactuals using Random Forest.
 
@@ -57,7 +57,6 @@ class ThresholdTree():
         instance : Data point
         target : Target label
         threshold_change : Change from threshold when changing the feature
-        robustness_factor : Factor to increase the robustness of the counterfactual
         n_estimators : Number of trees in the Random Forest
         ratio_of_trees : Ratio of trees to use for generating counterfactuals
 
@@ -179,7 +178,7 @@ class ThresholdTree():
         # Plot centroids
         sns.scatterplot(x=self.centers[:, 0], y=self.centers[:, 1], color='black', s=70, label='Cluster Centers')
         sns.scatterplot(x=[self._RF_instance[0]], y=[self._RF_instance[1]], color='red', s=120, label='Instance')
-        sns.scatterplot(x=[self._RF_cf[0]], y=[self._RF_cf[1]], color='blue', s=120, label='Counterfactual')
+        sns.scatterplot(x=self._RF_cf[:, 0], y=self._RF_cf[:, 1], color='blue', s=120, label='Counterfactual')
 
         plt.xlabel('Feature 1')
         plt.ylabel('Feature 2')
@@ -307,7 +306,7 @@ class ThresholdTree():
         self.update_tree(left_leaf_index, sample_left)
         self.update_tree(right_leaf_index, sample_right)
 
-    def predict(self, data_points):
+    def dtc_predict(self, data_points):
         
         def recursive_predict(node, data_point):
             if self._children_left[node] == -1:
@@ -402,7 +401,7 @@ class ThresholdTree():
             node_indicator[curr_node] = 1
         return node_indicator
         
-    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, robustness_factor=0.7, min_impurity_decrease=0.001):
+    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, min_impurity_decrease=0.001):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -411,7 +410,6 @@ class ThresholdTree():
         instance : Data point
         target : Target label
         threshold_change : Change from threshold when changing the feature
-        robustness_factor : Factor to increase the robustness of the counterfactual
         min_impurity_decrease : Minimum impurity decrease to split a node using DTC
 
         Returns
@@ -472,7 +470,6 @@ class ThresholdTree():
         targ = targ.astype(np.float32)
 
         cfs = np.zeros(shape=(target_leafs.shape[0], self._dims))
-        cfs_prime = np.zeros(shape=(target_leafs.shape[0], self._dims))
 
 
         for j,l in enumerate(target_leafs):
@@ -523,19 +520,6 @@ class ThresholdTree():
             # assert self.predict([cf]) == target
             cf = np.array(cf)
             cf = cf.astype(np.float32)
-            change = cf - instance
-            change[np.isclose(change, 0, atol=0.00001)] = 0
-
-            cfs_prime[j] = cf
-            for i in range(self._dims):
-                if change[i] != 0:
-                    change_prime = instance[i] + change[i] + ((target_point[i] - cf[i]) * robustness_factor)
-                    temp_cf = cfs_prime[j].copy()
-                    temp_cf[i] = change_prime
-                    # if clf.predict([temp_cf]) == target:
-                    if self.predict([temp_cf])[0] == target:
-                        cfs_prime[j][i] = change_prime
-            # print("-----------------------------------------------------------------------------------------")
             cfs[j] = cf
 
         # print("Instance: ")
@@ -548,8 +532,37 @@ class ThresholdTree():
         # all_cfs = np.concatenate((cfs, cfs_prime), axis=0)
         self._DTC_instance = instance
         self._DTC_cfs = cfs
-        self._DTC_cfs_prime = cfs_prime
-        return cfs, cfs_prime
+        return cfs 
+
+    def plausibility_fix(self, cfs, instance, target_cluster, method, plausibility_factor = 0.7):
+        cfs_prime = np.zeros(shape=(cfs.shape[0], self._dims))
+        target_point = self.centers[target_cluster, :]
+
+        if method == "DTC":
+            predict_fn = lambda x: self.dtc_predict([x])[0]
+        elif method == "IMM" and self._IMM_model is not None:
+            predict_fn = lambda x: self._IMM_model.predict(x)
+        else:
+            raise ValueError("Invalid method. Use 'DTC' or 'IMM'.")
+
+        for j, cf in enumerate(cfs):
+            change = cf - instance
+            change[np.isclose(change, 0, atol=0.00001)] = 0
+
+            cfs_prime[j] = cf
+            for i in range(self._dims):
+                if change[i] != 0:
+                    change_prime = instance[i] + change[i] + ((target_point[i] - cf[i]) * plausibility_factor)
+                    temp_cf = cfs_prime[j].copy()
+                    temp_cf[i] = change_prime
+                    if predict_fn(temp_cf) == target_cluster:
+                        cfs_prime[j][i] = change_prime
+
+        if method == "IMM":
+            self._IMM_cf_prime = cfs_prime
+        elif method == "DTC":
+            self._DTC_cfs_prime = cfs_prime
+        return cfs_prime
     
     def print_dtc_tree(self):
         """
@@ -613,7 +626,7 @@ class ThresholdTree():
         plt.title('Decision Tree Classifier Boundaries with Counterfactuals')
         plt.show()
 
-    def find_counterfactuals_imm(self, instance, target, threshold_change=0.0001, robustness_factor=0.7):
+    def find_counterfactuals_imm(self, instance, target, threshold_change=0.0001):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -622,7 +635,6 @@ class ThresholdTree():
         instance : Data point
         target : Target label
         threshold_change : Change from threshold when changing the feature
-        robustness_factor : Factor to increase the robustness of the counterfactual 
 
         Returns
         -------
@@ -657,25 +669,10 @@ class ThresholdTree():
                 if cf[curr_node.feature] < curr_node.threshold:
                     cf[curr_node.feature] = curr_node.threshold + threshold_change
 
-        change = cf - instance
-        # print(change)
-        change[np.isclose(change, 0, atol=0.00001)] = 0
-        cf_prime = cf.copy()
-        for i in range(self._dims):
-            if change[i] != 0:
-                change_prime = instance[i] + change[i] + ((target_point[i] - cf[i]) * robustness_factor)
-                temp_cf = cf_prime.copy()
-                temp_cf[i] = change_prime
-                # print(f"Pred: ", clf.predict([temp_cf2]))
-                if imm_model.predict(temp_cf) == target:
-                    cf_prime[i] = change_prime
-                else:
-                    print("can't change")
 
         self._IMM_instance = instance
         self._IMM_cf = cf
-        self._IMM_cf_prime = cf_prime
-        return np.array([cf]), np.array([cf_prime])
+        return np.array([cf])
 
     def print_imm_tree(self):
         """
@@ -728,7 +725,7 @@ class ThresholdTree():
         sns.scatterplot(x=self.centers[:, 0], y=self.centers[:, 1], color='black', s=70, label='Cluster Centers')
         sns.scatterplot(x=[self._IMM_instance[0]], y=[self._IMM_instance[1]], color='red', s=120, label='Instance')
         sns.scatterplot(x=[self._IMM_cf[0]], y=[self._IMM_cf[1]], color='blue', s=120, label='Counterfactual')
-        sns.scatterplot(x=[self._IMM_cf_prime[0]], y=[self._IMM_cf_prime[1]], color='green', s=120, label='C\'')
+        sns.scatterplot(x=[self._IMM_cf_prime[0][0]], y=[self._IMM_cf_prime[0][1]], color='green', s=120, label='C\'')
 
         # Plot the decision boundaries
         self._imm_plot_decision_boundaries(tree, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())

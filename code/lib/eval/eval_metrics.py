@@ -37,8 +37,6 @@ def cf_minimality(cf, instance) -> float:
     assert len(cf.shape) == 2
 
     res = np.equal(cf, instance).mean(axis=1)
-    if len(res) == 1:
-        return res[0]
     return res
 
 def cf_diversity(cf, per=0.05, dis = euclid_dis):

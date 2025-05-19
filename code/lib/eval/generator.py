@@ -8,14 +8,16 @@ class metrics(Enum):
     Plausibility = 2,
     Validity = 3,
     Diversity = 4,
-    Invalidation = 5
+    Invalidation = 5,
+    Runtime = 6
     
 def run(
         method, 
         centers, 
         X, 
         y, 
-        m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity],
+        runtimes,
+        m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity, metrics.Invalidation, metrics.Runtime],
         remove_invalid = True,
     ):
     results = []
@@ -26,7 +28,7 @@ def run(
         
     cfs_data = method["counterfactuals"]
 
-    for cf_data in tqdm(cfs_data):
+    for i, cf_data in tqdm(enumerate(cfs_data)):
         metric = []
         cf_original = np.array(cf_data.cf)
         instance = X[cf_data.instance]
@@ -63,10 +65,12 @@ def run(
             metric.append(cf_diversity(cf))
         if metrics.Invalidation in m:
             metric.append(cf_counterfactual_invalidation(cf, X, instance, centers, target))
+        if metrics.Runtime in m:
+            metrics.append(runtimes[i])
         
 
         results.append(metric)
     return results, returnNames()
 
 def returnNames():
-    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation"]
+    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation", "Runtime"]

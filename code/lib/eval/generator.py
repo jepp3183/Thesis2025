@@ -9,7 +9,9 @@ class metrics(Enum):
     Validity = 3,
     Diversity = 4,
     Invalidation = 5,
-    Runtime = 6
+    Correction = 6,
+    Runtime = 7,
+    PercentExplained = 8,
     
 def run(
         method, 
@@ -17,7 +19,7 @@ def run(
         X, 
         y, 
         runtimes,
-        m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity, metrics.Invalidation, metrics.Runtime],
+        m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity, metrics.Invalidation, metrics.Correction, metrics.Runtime, metrics.PercentExplained],
         remove_invalid = True,
     ):
     results = []
@@ -51,7 +53,9 @@ def run(
                 cf_validity(cf_original, target, centers),
                 [],
                 [],
-                runtimes[i]
+                [],
+                runtimes[i],
+                False
             ])
             continue
 
@@ -67,12 +71,16 @@ def run(
             metric.append(cf_diversity(cf))
         if metrics.Invalidation in m:
             metric.append(cf_counterfactual_invalidation(cf_original, X, cf_data.instance, centers, target))
+        if metrics.Correction in m:
+            metric.append(cf_counterfactual_invalidation(cf_original, X, cf_data.instance, centers, target, correction=True))
         if metrics.Runtime in m:
             metric.append(runtimes[i])
+        if metrics.PercentExplained in m:
+            metric.append(cf_percent_explained(cf_original, target, centers))
         
 
         results.append(metric)
     return results, returnNames()
 
 def returnNames():
-    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation", "Runtime"]
+    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation","Correction", "Runtime", "PercentExplained"]

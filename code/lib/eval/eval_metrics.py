@@ -49,7 +49,7 @@ def cf_diversity(cf, per=0.05, dis = euclid_dis):
 
     return np.linalg.det(m)
 
-def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_state=None, return_kmeans=False):
+def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_state=None, return_kmeans=False, correction=False):
     assert len(cf.shape) == 2
 
     kmeans_list = []
@@ -57,6 +57,11 @@ def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_stat
     result = np.zeros(len(cf))
     for i in range(len(cf)):
         cf_temp = cf[i]
+
+        pre_validity = cf_validity(np.array([cf_temp]), target, centers)
+        if pre_validity == correction:
+            result[i] = correction
+            continue
 
         new_kmeans = KMeans(n_clusters=len(centers), init=centers, random_state=random_state, n_init=1)
         new_X = X.copy()
@@ -71,3 +76,11 @@ def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_stat
     if return_kmeans:
         return result, kmeans_list
     return result
+
+def cf_percent_explained(cf, target, centers):
+    assert len(cf.shape) == 2
+
+    val = cf_validity(cf, target, centers).mean()
+    if val > 0:
+        return True
+    return False

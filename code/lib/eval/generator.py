@@ -28,7 +28,7 @@ def run(
         
     cfs_data = method["counterfactuals"]
 
-    for i, cf_data in tqdm(enumerate(cfs_data)):
+    for i, cf_data in enumerate(cfs_data):
         metric = []
         cf_original = np.array(cf_data.cf)
         instance = X[cf_data.instance]
@@ -49,7 +49,9 @@ def run(
                 [],
                 [],
                 cf_validity(cf_original, target, centers),
-                []
+                [],
+                [],
+                runtimes[i]
             ])
             continue
 
@@ -64,9 +66,9 @@ def run(
         if metrics.Diversity in m:
             metric.append(cf_diversity(cf))
         if metrics.Invalidation in m:
-            metric.append(cf_counterfactual_invalidation(cf, X, instance, centers, target))
+            metric.append(cf_counterfactual_invalidation(cf_original, X, cf_data.instance, centers, target))
         if metrics.Runtime in m:
-            metrics.append(runtimes[i])
+            metric.append(runtimes[i])
         
 
         results.append(metric)

@@ -77,6 +77,11 @@ class ThresholdTree():
             for i,j in enumerate(leaf_indices):
                 self.update_tree(j,leaf_sample_lists[i])
 
+    def fit_imm(self):
+        imm_model = imm()
+        imm_model.fit(self.X, self.y, self.centers)
+        self._IMM_model = imm_model
+
 
     def find_counterfactuals_rf(self, instance, target, threshold_change=0.1, n_estimators=20, ratio_of_trees=1):
         """
@@ -662,13 +667,12 @@ class ThresholdTree():
         -------
         List of counterfactuals
         """
-        imm_model = imm()
-        imm_model.fit(self.X, self.y, self.centers)
-        self._IMM_model = imm_model
+        assert self._IMM_model is not None, "IMM model has not been trained yet."
+        
         target_point = self.centers[target, :]
 
-        instance_path = imm_model.get_path(instance)
-        target_path = imm_model.get_path(target_point)
+        instance_path = self._IMM_model.get_path(instance)
+        target_path = self._IMM_model.get_path(target_point)
 
         path_len = min(len(instance_path), len(target_path))
         path_equality = instance_path[:path_len] == target_path[:path_len]

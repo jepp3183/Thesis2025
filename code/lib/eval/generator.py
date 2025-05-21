@@ -12,16 +12,28 @@ class metrics(Enum):
     Correction = 6,
     Runtime = 7,
     PercentExplained = 8,
+    NumberOfValidCFs = 9,
     
 def run(
-        method, 
-        centers, 
-        X, 
-        y, 
-        runtimes,
-        m = [metrics.Similarity, metrics.Minimality, metrics.Plausibility, metrics.Validity, metrics.Diversity, metrics.Invalidation, metrics.Correction, metrics.Runtime, metrics.PercentExplained],
-        remove_invalid = True,
-    ):
+    method,
+    centers,
+    X,
+    y,
+    runtimes,
+    m = [
+        metrics.Similarity,
+        metrics.Minimality,
+        metrics.Plausibility,
+        metrics.Validity,
+        metrics.Diversity,
+        metrics.Invalidation,
+        metrics.Correction,
+        metrics.Runtime,
+        metrics.PercentExplained,
+        metrics.NumberOfValidCFs
+    ],
+    remove_invalid = True,
+):
     results = []
     print("Starting on: " + method["name"])
     if remove_invalid:
@@ -52,10 +64,11 @@ def run(
                 [],
                 cf_validity(cf_original, target, centers),
                 [],
-                [],
-                [],
+                np.array([False for _ in range(len(cf_original))], dtype=bool),
+                np.array([False for _ in range(len(cf_original))], dtype=bool),
                 runtimes[i],
-                False
+                False,
+                0
             ])
             continue
 
@@ -77,10 +90,13 @@ def run(
             metric.append(runtimes[i])
         if metrics.PercentExplained in m:
             metric.append(cf_percent_explained(cf_original, target, centers))
+        if metrics.NumberOfValidCFs in m:
+            val = cf_validity(cf_original, target, centers)
+            metric.append(val * len(cf_original))
         
 
         results.append(metric)
     return results, returnNames()
 
 def returnNames():
-    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation","Correction", "Runtime", "PercentExplained"]
+    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation","Correction", "Runtime", "PercentExplained", "NumberOfValidCFs"]

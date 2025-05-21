@@ -48,6 +48,36 @@ class ThresholdTree():
         self._RF_instance = None
         self._RF_cf = None
 
+    def fit_dtc(self, improve_tree_fidelity, min_impurity_decrease=0.001):
+        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)#, min_samples_leaf=self.X.shape[0] // 20)
+        clf.fit(self.X, self.y)
+        print(f"DTC accuracy: {clf.score(self.X, self.y)}")
+
+        self._DTC_model = clf
+        self._thresholds = clf.tree_.threshold.copy()
+        self._features = clf.tree_.feature.copy()
+        self._children_left = clf.tree_.children_left.copy()
+        self._children_right = clf.tree_.children_right.copy()
+        self._values = clf.tree_.value.copy()
+        self._n_node_samples = clf.tree_.n_node_samples.copy()
+
+        # Generate parent list for tree
+        self._parents = np.full(self._thresholds.shape[0], -1, dtype=int)
+        for i in range(self._thresholds.shape[0]):
+            if self._children_left[i] != -1:
+                self._parents[self._children_left[i]] = i
+            if self._children_right[i] != -1:
+                self._parents[self._children_right[i]] = i
+        
+        sample_leaf_indices = clf.apply(self.X)
+        leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
+        leaf_sample_lists = [[i for i in range(sample_leaf_indices.shape[0]) if sample_leaf_indices[i] == leaf_indices[j]] for j in range(clf.get_n_leaves())]
+    
+        if improve_tree_fidelity:
+            for i,j in enumerate(leaf_indices):
+                self.update_tree(j,leaf_sample_lists[i])
+
+
     def find_counterfactuals_rf(self, instance, target, threshold_change=0.1, n_estimators=20, ratio_of_trees=1):
         """
         Find counterfactuals using Random Forest.
@@ -444,7 +474,13 @@ class ThresholdTree():
 
         return centers
 
-    def find_counterfactuals_dtc(self, instance, target, threshold_change=0.1, min_impurity_decrease=0.001, improve_tree_fidelity=True, filter_target_leafs=True):
+    def find_counterfactuals_dtc(
+        self,
+        instance,
+        target,
+        threshold_change=0.1,
+        filter_target_leafs=True
+    ):
         """
         Find counterfactuals using Decision Tree Classifier.
 
@@ -453,42 +489,13 @@ class ThresholdTree():
         instance : Data point
         target : Target label
         threshold_change : Change from threshold when changing the feature
-        min_impurity_decrease : Minimum impurity decrease to split a node using DTC
-        improve_tree_fidelity : Whether to improve tree fidelity by recursively splitting leafs
         filter_target_leafs : Whether to filter target leafs based on the model prediction of the leaf centers
 
         Returns
         -------
         List of counterfactuals
         """
-
-        clf = DecisionTreeClassifier(random_state=42, min_impurity_decrease=min_impurity_decrease)#, min_samples_leaf=self.X.shape[0] // 20)
-        clf.fit(self.X, self.y)
-        print(f"DTC accuracy: {clf.score(self.X, self.y)}")
-
-        self._DTC_model = clf
-        self._thresholds = clf.tree_.threshold.copy()
-        self._features = clf.tree_.feature.copy()
-        self._children_left = clf.tree_.children_left.copy()
-        self._children_right = clf.tree_.children_right.copy()
-        self._values = clf.tree_.value.copy()
-        self._n_node_samples = clf.tree_.n_node_samples.copy()
-
-        # Generate parent list for tree
-        self._parents = np.full(self._thresholds.shape[0], -1, dtype=int)
-        for i in range(self._thresholds.shape[0]):
-            if self._children_left[i] != -1:
-                self._parents[self._children_left[i]] = i
-            if self._children_right[i] != -1:
-                self._parents[self._children_right[i]] = i
-        
-        sample_leaf_indices = clf.apply(self.X)
-        leaf_indices = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1])
-        leaf_sample_lists = [[i for i in range(sample_leaf_indices.shape[0]) if sample_leaf_indices[i] == leaf_indices[j]] for j in range(clf.get_n_leaves())]
-    
-        if improve_tree_fidelity:
-            for i,j in enumerate(leaf_indices):
-                self.update_tree(j,leaf_sample_lists[i])
+        assert self._DTC_model is not None, "DTC model has not been trained yet."
 
         # Find all leafs that are of the target class 
         target_leafs = np.array([x for x in range(self._thresholds.shape[0]) if self._children_left[x] == -1 and np.argmax(self._values[x]) == target])

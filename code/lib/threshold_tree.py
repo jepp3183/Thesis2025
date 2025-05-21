@@ -483,8 +483,8 @@ class ThresholdTree():
         self,
         instance,
         target,
-        threshold_change=0.1,
-        filter_target_leafs=True
+        filter_target_leafs,
+        threshold_change=0.1
     ):
         """
         Find counterfactuals using Decision Tree Classifier.

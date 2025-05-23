@@ -314,7 +314,7 @@ class Gainer:
         return 1 - torch.clip(y, 0, 1)
 
 
-def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solutions=None, histories=None, ax=None):
+def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solutions=None, histories=None, ax=None, heatmap=True):
     if use_pca:
         pca = PCA(n_components=2)
         X = pca.fit_transform(X)
@@ -329,7 +329,7 @@ def plot_heatmap(X, y, C, random_point, fn, target_cluster, use_pca=False, solut
 
 
     # Create a grid for the heatmap
-    if not use_pca:
+    if not use_pca and heatmap:
         x_min, x_max = X[:, 0].min(), X[:, 0].max()
         y_min, y_max = X[:, 1].min(), X[:, 1].max()
         xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100),

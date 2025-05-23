@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 class metrics(Enum):
     Similarity = 0,
-    Minimality = 1,
+    Sparsity = 1,
     Plausibility = 2,
     Validity = 3,
     Diversity = 4,
@@ -12,7 +12,7 @@ class metrics(Enum):
     Correction = 6,
     Runtime = 7,
     PercentExplained = 8,
-    NumberOfValidCFs = 9,
+    ValidCFs = 9,
     
 def run(
     method,
@@ -22,7 +22,7 @@ def run(
     runtimes,
     m = [
         metrics.Similarity,
-        metrics.Minimality,
+        metrics.Sparsity,
         metrics.Plausibility,
         metrics.Validity,
         metrics.Diversity,
@@ -30,7 +30,7 @@ def run(
         metrics.Correction,
         metrics.Runtime,
         metrics.PercentExplained,
-        metrics.NumberOfValidCFs
+        metrics.ValidCFs
     ],
     remove_invalid = True,
 ):
@@ -74,7 +74,7 @@ def run(
 
         if metrics.Similarity in m:
             metric.append(cf_similarity(cf, instance))
-        if metrics.Minimality in m:
+        if metrics.Sparsity in m:
             metric.append(cf_minimality(cf, instance))
         if metrics.Plausibility in m:
             metric.append(cf_plausibility(cf, target, X, y))
@@ -90,7 +90,7 @@ def run(
             metric.append(runtimes[i])
         if metrics.PercentExplained in m:
             metric.append(cf_percent_explained(cf_original, target, centers))
-        if metrics.NumberOfValidCFs in m:
+        if metrics.ValidCFs in m:
             val = cf_validity(cf_original, target, centers)
             metric.append(val * len(cf_original))
         
@@ -99,4 +99,4 @@ def run(
     return results, returnNames()
 
 def returnNames():
-    return ["Similarity", "Minimality", "Plausibility", "Validity", "Diversity", "Invalidation","Correction", "Runtime", "PercentExplained", "NumberOfValidCFs"]
+    return ["Similarity", "Sparsity", "Plausibility", "Validity", "Diversity", "Invalidation","Correction", "Runtime", "PercentExplained", "ValidCFs"]

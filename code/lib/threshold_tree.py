@@ -650,6 +650,7 @@ class ThresholdTree():
         self._dtc_plot_decision_boundaries(root_node, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
         plt.xlabel('Feature 1')
         plt.ylabel('Feature 2')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.title('Decision Tree Classifier Boundaries with Counterfactuals')
         plt.show()
 
@@ -752,6 +753,7 @@ class ThresholdTree():
         self._imm_plot_decision_boundaries(tree, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
         plt.xlabel('Feature 1')
         plt.ylabel('Feature 2')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.title('IMM Boundaries with Counterfactuals')
 
         plt.show()

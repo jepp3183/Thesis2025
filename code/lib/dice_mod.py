@@ -150,9 +150,9 @@ class Gainer:
         kwargs:
             eps [0-1], default: 0. Controls how close the solution will be to the target cluster center.
         """
-        print(f"X: {X.shape}")
-        print(f"C: {C.shape}")
-        print(f"x: {x.shape}")
+        # print(f"X: {X.shape}")
+        # print(f"C: {C.shape}")
+        # print(f"x: {x.shape}")
 
         self.eps = kwargs.get("eps", 0)
 
@@ -229,7 +229,6 @@ class Gainer:
         return res
     
     def sig(self, d):
-        # off = (1 - self.eps) * self.max_t
         off = (1 - self.eps)*self.sig_offset
 
         if d < off:

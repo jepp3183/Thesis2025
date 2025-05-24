@@ -49,6 +49,20 @@ def run(
         target = cf_data.target
 
         if remove_invalid:
+            if len(cf_original) == 0:
+                results.append([
+                    [],
+                    [],
+                    [],
+                    0.0,
+                    [],
+                    np.array([False for _ in range(len(cf_original))], dtype=bool),
+                    np.array([False for _ in range(len(cf_original))], dtype=bool),
+                    runtimes[i],
+                    False,
+                    0
+                ])
+                continue
             dists = np.linalg.norm(cf_original[:, None] - centers, axis=2)
             pred = np.argmin(dists, axis = 1) 
             r = pred == int(target)

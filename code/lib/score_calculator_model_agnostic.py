@@ -35,14 +35,23 @@ class ScoreCalculatorModelAgnostic:
 
         critic = MMDCritic(X, RBFKernel(sigma=1), criticism_kernel=RBFKernel(0.025), labels=y)
 
-        protos, proto_labels = critic.select_prototypes(int(amount_of_coreset_points * 0.16))
-        criticisms, criticism_labels = critic.select_criticisms(int(amount_of_coreset_points * 0.04), protos)
-    
-        stc_X = np.concatenate([protos, criticisms], axis=0)
-        stc_y = np.concatenate([proto_labels, criticism_labels], axis=0)
+        n_classes = len(np.unique(y))
+        stc_y = np.array([])
 
-        unlabeled_indices = np.random.rand(stc_y.shape[0]) < 0.3
-        stc_y[unlabeled_indices] = -1
+        #Retry until all classes are represented in the subset
+        while len(np.unique(stc_y)) < n_classes + 1: # + 1 included to acccount for unlabeled (-1)
+            protos, proto_labels = critic.select_prototypes(int(amount_of_coreset_points * 0.16))
+            criticisms, criticism_labels = critic.select_criticisms(int(amount_of_coreset_points * 0.04), protos)
+        
+            stc_X = np.concatenate([protos, criticisms], axis=0)
+            stc_y = np.concatenate([proto_labels, criticism_labels], axis=0)
+
+            print(np.unique(stc_y))
+
+            unlabeled_indices = np.random.rand(stc_y.shape[0]) < 0.3
+            stc_y[unlabeled_indices] = -1
+
+            print(np.unique(stc_y))
 
         etc = ExtraTreesClassifier()
         self._model = SelfTrainingClassifier(etc)

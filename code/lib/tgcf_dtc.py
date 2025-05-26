@@ -172,6 +172,8 @@ class TGCF_dtc():
         
         def get_percentage(labels):
             total = len(labels)
+            if total == 0:
+                return np.array([[[0 for _ in range(self.k)]]])
             amount = Counter(labels)
 
             return np.array([[[ (amount.get(i, 0) / total) for i in range(self.k) ]]])

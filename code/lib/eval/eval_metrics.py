@@ -36,6 +36,9 @@ def cf_minimality(cf, instance):
 def cf_diversity(cf, per=0.05, dis = euclid_dis):
     assert len(cf.shape) == 2
 
+    if len(cf) == 0:
+        return None
+
     m = np.empty((len(cf), len(cf)))
     for i in range(len(cf)):
         m[:,i] = [(1.0 / (1 + dis(cf[i], cf_t))) for cf_t in cf]

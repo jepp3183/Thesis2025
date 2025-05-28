@@ -106,7 +106,7 @@ def run(
         if metrics.PercentExplained in m:
             metric.append(cf_percent_explained(cf_original, target, centers))
         if metrics.ValidCFs in m:
-            val = cf_validity(cf_original, target, centers)
+            val = cf_validity(cf_original, target, centers).mean()
             metric.append(val * len(cf_original))
         
         if dbg:

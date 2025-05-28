@@ -14,7 +14,7 @@ def cf_validity(cf, target_cluster, centers, eval = center_prediction):
 
     dists = np.linalg.norm(cf[:, None] - centers, axis=2)
     pred = np.argmin(dists, axis = 1) 
-    return (pred == int(target_cluster)).mean()
+    return pred == int(target_cluster)
 
 def cf_plausibility(cf, target, X, y):
     assert len(cf.shape) == 2
@@ -52,7 +52,7 @@ def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_stat
     result = []
     for i,cf_temp  in enumerate(cf):
 
-        pre_validity = cf_validity(np.array([cf_temp]), target, centers)
+        pre_validity = cf_validity(np.array([cf_temp]), target, centers).mean()
 
         if pre_validity == correction:
             continue
@@ -64,13 +64,13 @@ def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_stat
         new_centers = new_kmeans.cluster_centers_
 
         formated_cf = np.array([cf_temp])
-        post_valid = cf_validity(formated_cf, target, new_centers)
+        post_valid = cf_validity(formated_cf, target, new_centers).mean()
 
         result.append(post_valid == correction)
 
     if len(result) == 0:
         return None
-    return np.array(result).mean()
+    return np.array(result)
 
 def cf_percent_explained(cf, target, centers):
     assert len(cf.shape) == 2

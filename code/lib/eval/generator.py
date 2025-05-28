@@ -33,6 +33,7 @@ def run(
         metrics.ValidCFs
     ],
     remove_invalid = True,
+    dbg = False
 ):
     results = []
     print("Starting on: " + method["name"])
@@ -108,6 +109,8 @@ def run(
             val = cf_validity(cf_original, target, centers)
             metric.append(val * len(cf_original))
         
+        if dbg:
+            print('\n'.join([f'{n}: {m}' for n,m in zip(returnNames(), metric)])) 
 
         results.append(metric)
     return results, returnNames()

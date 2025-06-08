@@ -94,6 +94,25 @@ class TGCF_imm():
         self._IMM_instance = instance
         self._IMM_cf = cf
         return cf
+    
+    def _imm_accuracy(self):
+        """
+        Calculate the accuracy of the IMM model subject to cluster labels.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        Accuracy of the IMM model
+        """
+
+        if self._IMM_model is None:
+            raise TypeError("IMM model hasn't been trained yet.")
+        
+        predictions = np.array([self._IMM_model.predict(x) for x in self.X])
+        accuracy = np.sum(predictions == self.y) / len(self.y)
+        return accuracy
 
     def print_tree(self):
         """
@@ -150,10 +169,11 @@ class TGCF_imm():
 
         # Plot the decision boundaries
         self._plot_decision_boundaries(tree, self.X[:, 0].min(), self.X[:, 0].max(), self.X[:, 1].min(), self.X[:, 1].max())
-        plt.xlabel('Feature 1')
-        plt.ylabel('Feature 2')
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.title('IMM Boundaries with Counterfactuals')
+        plt.xlabel('x1')
+        plt.ylabel('x2')
+        # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend().set_visible(False)
+        plt.title(f'IMM splits with counterfactuals (accuracy: {(self._imm_accuracy()):.3f})')
 
         plt.show()
         

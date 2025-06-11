@@ -1,0 +1,9 @@
+,CFAE,CFDE
+Dissimilarity,1.56 ± 0.75,1.85 ± 0.84
+Sparsity,0.21 ± 0.23,0.54 ± 0.16
+Plausibility,-1.38 ± 0.46,-1.79 ± 0.82
+Validity,1.00 ± 0.00,1.00 ± 0.00
+Diversity,0.00 ± 0.00,0.00 ± 0.00
+Runtime,0.02 ± 0.01,0.03 ± 0.02
+%Explained,1.00,1.00
+#Valid,10.00 ± 0.00,10.00 ± 0.00

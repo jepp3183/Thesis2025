@@ -33,23 +33,25 @@ def cf_minimality(cf, instance):
     res = np.equal(cf, instance).mean(axis=1)
     return res
 
-def cf_diversity(cf, per=0.05, dis = euclid_dis):
+def cf_diversity(cf, per=0.0001, dis = euclid_dis):
     assert len(cf.shape) == 2
 
-    if len(cf) == 0:
+    if len(cf) < 2:
         return None
 
     m = np.empty((len(cf), len(cf)))
     for i in range(len(cf)):
         m[:,i] = [(1.0 / (1 + dis(cf[i], cf_t))) for cf_t in cf]
-        m[i,i] += random.uniform(per,per*2)
+        m[i,i] += per
 
     return np.linalg.det(m)
 
-def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_state=None, correction=False):
+def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_state=None, correction=False, return_kmeans=False):
     assert len(cf.shape) == 2
 
+    kmeansList = []
     result = []
+    indicies = []
     for i,cf_temp  in enumerate(cf):
 
         pre_validity = cf_validity(np.array([cf_temp]), target, centers).mean()
@@ -67,6 +69,13 @@ def cf_counterfactual_invalidation(cf, X, instance, centers, target, random_stat
         post_valid = cf_validity(formated_cf, target, new_centers).mean()
 
         result.append(post_valid == correction)
+        indicies.append(i)
+        kmeansList.append(new_kmeans)
+
+    if return_kmeans:
+        if len(result) == 0:
+            return None, kmeansList, indicies
+        return np.array(result), kmeansList, indicies
 
     if len(result) == 0:
         return None

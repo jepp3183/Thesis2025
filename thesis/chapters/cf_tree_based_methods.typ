@@ -1,31 +1,112 @@
-== Novel Tree-Based Counterfactual Methods<tree_methods>
-Another venue of design for generating counterfactuals for unsupervised tasks could be implemented by exploiting information contained in decision tree approximations of the clustering task. This idea of utilizing decision trees for explanations in a post-hoc manner comes from methods such as @cravenExtractingTreeStructuredRepresentations1995, who highlight that decision trees functions as intuitive explanation models, as they reveal decision logic implemented by the black box model. This enables decision trees to be used as an appropriate surrogate model for our black box. These surrogate decision trees enable an analyzer to move along the tree to reason about the clustering or classification of a certain data instance. This in turn enables an analyst to reason about possible counterfactual changes for an alternative outcome.
+#import "../lib.typ": *
 
-=== Our novel model (name) / alternative title
-To solve the task of generating valid and intuitive counterfactuals, we have made a novel method based on this class of tree-based explanation models. Our proposed method is model-agnostic in that it works with any clustering model and that any kind of surrogate decision tree model can be employed. Our method furthermore reveals intuitive counterfactual changes as a usual decision tree partitions the data based on simple if-else rules. Though one thing to keep in mind when using these kinds of models, is that decision trees can have a fidelity/complexity trade-off as we often have to employ deeper trees to generate a more faithful surrogate model.
+== Novel tree-based counterfactual methods<tree_methods>
+As argued in @dasguptaExplainableKMeansKMedians2020, decision trees can be used to partition data, in order to characterize clusters. This leads to another venue for counterfactuals in unsupervised tasks, based on exploiting information in decision trees trained to approximate a given clustering. Such trees offer a convenient way of changing the predicted cluster by switching branches in the tree. Thus, if given a point $x$, one can easily reason about the changes needed to obtain a counterfactual $x'$ belonging to a target cluster. These changes amount to switching branches in the tree based on simple if-else rules.
 
-To generate counterfactuals using (name---------------), we will first need an instance to be explained and a target cluster. The next step of the algorithm is then to train our choice of a surrogate decision tree model for our task. We chose two different decision tree methods to be able to compare their results and also to show how the algorithm functions with alternative surrogate models. The first decision tree model that we will be using is Sci-Kit Learns Decision Tree Classifier(DCT)#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html], which we will train on the cluster labels. One problem with this specific surrogate model is that it introduces a hyperparameter "min_impurity_decrease", which will impact the fidelity of the trained surrogate model. The second model that we will be using is the Iterative Mistake Minimization (IMM) algorithm introduced in @dasguptaExplainableKMeansKMedians2020. In @dasguptaExplainableKMeansKMedians2020, they work with the task of creating simple explanations of clusters using small decision trees. These decision trees will have k leafs, one for each cluster and a depth of at most $k-1$. In each iteration of the algorithm it aims to create a cut or decision boundary to minimize the amount of points that are not categorized into the same leaf as its cluster center. This approach will result in few and simple feature thresholds, which will help in intuitive understanding of cluster assignments. An example of an explanation of the IMM algorithm can be seen on @fig:imm_example.
+Additionally, given a simple decision tree with small depth, few branch switches are required for changing the prediction of $x$ to the target cluster. Thus, the sparsity of the counterfactuals may improve with simpler decision trees.
 
+=== Tree-Guided Counterfactuals (TGCF) <sec:tgcf>
+Based on the discussion above, we present Tree-Guided Counterfactuals (TGCF), a novel tree-based counterfactual method. TGCF aims to generate counterfactuals by changing feature values of $x$ based on decision thresholds on the path to all target leaves.
+
+To generate counterfactuals using Tree-Guided Counterfactuals (TGCF), we first need an instance $x$ to be explained and a target cluster. The algorithm then trains a surrogate decision tree to approximate the clustering. We chose two different decision tree methods to be able to compare their results and show how the algorithm functions with alternative models. The first method is Scikit-learn's Decision Tree Classifier (DTC)#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html], trained on the cluster labels. A potential problem with this specific method is that it is likely to overfit the data, yielding a very deep decision tree in order to obtain the highest possible accuracy. 
+
+Alternatively, the second method is Iterative Mistake Minimization (IMM), introduced in @dasguptaExplainableKMeansKMedians2020. In this paper, they work with the task of creating simple explanations of clusters using small decision trees. These decision trees will have $k$ leaves, one for each cluster, and a depth of at most $k-1$. Of course, this comes with a likely decrease in accuracy, given the simplicity of the generated tree. In each iteration of the algorithm it creates a split, partitioning the dataset to minimize the number of mistakes, defined as points that are not categorized into the same leaf as its cluster center. This approach differs from traditional decision tree algorithms, which seek to minimize entropy in the leaves created by each split. The effect of this difference is clearly visible in @fig:imm_split, where traditional algorithms lead to an arbitrarily high clustering cost, while IMM creates a better approximation by minimizing the number of mistakes.
+#figure(
+  image("../assets/imm_split.png", width: 55%),
+  caption: [
+    The difference between IMM and traditional decision trees based on entropy. In this case, the traditional algorithm will result in an arbitrarily high cost for the resulting clusters @dasguptaExplainableKMeansKMedians2020.
+  ]
+)<fig:imm_split>
+This approach will result in few feature thresholds, which will help in gaining an intuitive understanding of cluster assignments. An example of an explanation generated by the IMM algorithm can be seen in @fig:imm_example, where a clustering is approximated using only 4 thresholds. However, IMM yields a lower accuracy to the true clusters, where traditional decision trees would perform better, but with a much more complex tree. What follows is a high-level explanation of the TGCF algorithm, which can also be seen in @alg:tgcf.
 #figure(
   image("../assets/imm_example.png"),
-  caption: [Example of IMM threshold tree explanation from @dasguptaExplainableKMeansKMedians2020, where each cluster is assigned to its own leaf]
+  caption: [Example of IMM threshold tree explanation from @dasguptaExplainableKMeansKMedians2020, where each cluster is assigned to its own leaf.]
 )<fig:imm_example>
 
-After a surrogate model has been chosen and fitted to the unsupervised task at hand, the next step is to find the tree path to our explained instance and the path to each leaf representing the target cluster. For the IMM tree we will only have a single target leaf as each cluster will be assigned only to one leaf, but for the DCT we can have an arbitrary amount of target leafs based on how accurate we want our model to be. 
-
-After all paths have been calculated we want to find the deepest node in the tree for each target leaf that is a parent for both that target and the instance leaf. From the deepest common parent node in the tree for any given target leaf, we know that the target and the instance must have the taken the same path in the tree to this node and therefore already share the necessary feature values for the decision thresholds. This aforementioned fact ensures that we only have to change our instance based on the feature thresholds evaluated from this common parent on the path to the target leaf. To put this fact into perspective we can again look at the visualization on @fig:imm_example subplot (c), where if we want to go from an instance in cluster 3 to target cluster 4, we will only have to change our instance based on the thresholds: $y <= -4$ and $y<= 4$, which results in a y-value in the interval $[-4,4)$. As we only change our instance's features depending on the feature threshold on the path to the target leaf we are also ensured that we will get a classification of the counterfactual in the target class, at least in respect to the surrogate model. Though this will not always ensure a valid counterfactual when evaluating the cluster assignment. After the procedure has been applied to every target leaf in the surrogate model, we will have a candidate counterfactual for each of these leafs. 
-
-On @fig:dtc_vs_imm we can see (name---------------) using each of the proposed surrogate models, each model has precisely 5 leafs, one for each cluster, which can be obtained by DTC because of a relatively simple 2-dimensional synthetic data. In the presented example the target cluster is 2, which is also the predicted cluster when predicting using the surrogate model. Though it is also quite easily observed that these counterfactuals are not valid when evaluated subject to the actual cluster labels. To solve this we added a post-processing step to achieve a higher robustness for the found counterfactuals. We call these more robust counterfactuals $C'$, which can also be se on @fig:dtc_vs_imm. The robustness and change of our counterfactuals are reliant on the hyperparameter "robustness_factor", which takes values between 0 and 1, signifying how much the algorithm should change previously permuted features towards the target centroid in that dimension.
+After a surrogate model has been chosen and fitted to the data, the next step is to find the tree path to the leaf containing the instance $x$ and the path to each leaf representing the target cluster. For the IMM tree we will only have a single target leaf as each cluster will be assigned only to one leaf. For the DTC,  we define every leaf with a majority of points from the target cluster as a target leaf. Thus, we can have an arbitrary number of target leaves based on how accurate we want our model to be and the complexity of the clustering. In this case, the algorithm will generate a counterfactual for each target leaf in the tree.
 
 #figure(
+  kind: "algorithm",
+  supplement: [Algorithm],
+  caption: [Pseudocode for TGCF, where $epsilon$ is a minimal value to move the counterfactual to the other side of the feature threshold boundary.],
+  pseudocode-list(booktabs: true, title: [*TGCF*($x$, target, $C={C_0,C_1,dots,C_(k-1)}$, $"surrogate"$)])[ 
+  + tree = surrogate.fit(C) #comment("Fit surrogate model on cluster labels")
+  + $"target_leaves" = "tree"."get_targets"()$ #comment("Find all target leaves in tree")
+  + $"source_leaf" = "tree"."get_leaf"(x)$
+  + $"cfs"={}$
+  + *for* $l$ *in* $"target_leaves"$
+    + $"path"_l = "path_to_leaf"(l)$
+    + $"node" = "first_common_ancestor"(l,"source_leaf")$
+    + $x' = x$
+    + *while* $"node" != l$
+      + $f = "node"."feature"$ 
+      + $t = "node"."threshold"$ 
+      + *if* $"path"_l."next_child_is_left"()$ #comment([Is a left split taken towards $l$]) 
+        + *if* $x'_f >= t$
+          + $x'_f = t - epsilon$ #comment("Move feature value to other side")
+      + *else if* $"path"_l."next_child_is_right"()$
+        + *if* $x'_f < t$ 
+            + $x'_f = t $
+      + $"node" = "path"_l."get_child"("node")$
+    + $"cfs"."add"(x')$
+  + *Return* cfs
+])<alg:tgcf>
+
+
+After these paths have been calculated, we want to find the first common ancestor for the instance and target leaf, for each target leaf in the tree. From the first common ancestor in the tree for any given target leaf, we know that the target and the instance must have taken the same path from the root to this node. For this reason, they must already share the necessary feature values for the decision thresholds to this point in the tree. This fact ensures that we only have to change the instance based on the feature thresholds on the path from the common ancestor to the target leaf. To put this fact into perspective, we can again look at the visualization in @fig:imm_example(c). If we want to go from an instance in cluster 3 to target cluster 4, we will only have to change our instance based on the thresholds: $y <= -4$ and $y<= 4$, which results in a y-value in the interval $[-4,4)$. As we only change the instance's features depending on the thresholds on the path to the target leaf, we are guaranteed a classification of the counterfactual in the target class, with respect to the surrogate model. However, depending on how well the model approximates the clustering, this will not always ensure a valid counterfactual based on the actual cluster memberships. After the procedure has been applied to every target leaf in the surrogate model, we have a candidate counterfactual for each leaf. 
+
+In @fig:dtc_vs_imm we present a visualization of the TGCF algorithm using each of the proposed surrogate models. Clearly, DTC yields a more complex tree with 13 leaves, while IMM only has 5, one for each cluster. Naturally, this means that DTC has better accuracy on the data compared to IMM, which sacrifices performance for lower tree complexity. In the presented example, the target cluster is 2, which is also the predicted label for the counterfactuals when predicting using the surrogate models. However, when assigning the counterfactuals, all 3 are invalid since they are still closest to the source center. This is because each change in the counterfactual sets the given feature value equal to the threshold, barely moving it to the correct side of the split.
+
+To account for this problem, we add a post-processing step to achieve higher validity and plausibility for the generated counterfactuals, which we call plausibility improvement. This is done by moving the counterfactuals closer to the target center by further modifying each already modified feature, thereby keeping the same sparsity. We call this improved counterfactual $C'$. By using a hyperparameter $lambda in [0,1]$ each feature $i$ of $C'$ is defined as follows, where #box[$A subset.eq F$] is the set of all changed features between $x$ and $x'$:
+
+$
+C'_i = x'_i + lambda (c_"target"_i - x'_i) #h(20pt) "for all" i in A.
+$
+
+However, since this modification may change the cluster label predicted by the surrogate model, it is only applied for a given feature if the prediction does not change. This action ensures that counterfactuals which normally lie on the cluster boundary are pushed further towards the target center, while still being valid according to the surrogate model. This means that the modified counterfactuals may change leaf membership, but only into another leaf representing the target cluster. While this does not guarantee validity according to the actual clustering, we find significant improvements in both validity and plausibility. The modified counterfactuals $C'$ are visualized in @fig:dtc_vs_imm along with the initial counterfactuals, which are located on the boundaries induced by the tree splits.
+
+The complexity of TGCF is highly dependent on the complexity of the chosen surrogate model, and therefore also on the structure of the dataset. The computationally most expensive part of the algorithm consists of training the surrogate model, although this must only be done once for a given clustering since the tree can be reused for further counterfactual generation.
+
+#figure(
+  // placement: none,
   image("../assets/dtc_vs_imm.png"),
-  caption: [Comparison of (name----------------) using surrogate model Decision Tree Classifier#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html] and IMM @dasguptaExplainableKMeansKMedians2020, with C' generated using a robustness factor of 0.7]
+  caption: [Comparison of TGCF using Decision Tree Classifier#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html] and IMM @dasguptaExplainableKMeansKMedians2020 as surrogate models, with $C'$ generated using $lambda=0.7$.]
 )<fig:dtc_vs_imm>
 
-The complexity of this algorithm is very much dependant on the complexity or fidelity of the chosen surrogate model. For the IMM algorithm we know that the tree can have a depth of at most $k-1$, which induces at most $k-1$ changes to achieve a counterfactual, though the amount of changes would only be $log(k)$ for a balanced tree. For the Decision Tree Classifier we cannot say anything specific about the complexity as this is again very dependant on the depth of the tree and also the amount of target leafs that we will have to run the algorithm on.
+For the IMM algorithm, we know that the tree can have a depth of at most #box[$k-1$], which induces at most $k-1$ changes to generate a counterfactual, though the number of changes would only be $log(k)$ for a balanced tree. For the Decision Tree Classifier, we cannot say anything specific about the complexity as this is dependent on the depth of the tree and the number of target leaves that we run the algorithm on. 
 
-=== Could run on forest/ensemble of trees
+Our proposed method can employ any kind of surrogate decision tree model for use in counterfactual generation. Furthermore, our method reveals intuitive counterfactual changes as a decision tree partitions the data based on simple if-else rules. Though one thing to keep in mind when using these kinds of models, is that decision trees can have a fidelity/complexity trade-off, as we often have to employ deeper trees to generate a more faithful surrogate model that better approximates the given clusters.
+
+=== Validity problem for TGCF
+When implementing the algorithm outlined above, we found that it achieved very low validity for the generated counterfactuals. An example of why this happens can be seen in the left plot in @fig:dtc_validity_example, where a reasonable threshold split is created by the Decision Tree Classifier to separate target cluster $0$ from all others. Although this creates a good split with regards to the accuracy of the surrogate model, the generated tree will lead to many invalid counterfactuals when using the TGCF method. For example, if one were to generate a counterfactual for the given instance in the left plot in @fig:dtc_validity_example, the algorithm will only make a counterfactual change based on this single threshold of feature 2. The generated counterfactual will therefore still be assigned to the source cluster. A visualization of the actual tree structure for this example can be seen in @app:tt_tree_example.
+
+#figure(
+  image("../assets/tt_dtc_validity_example.png"),
+  caption: [TGCF using DTC as a surrogate model with $lambda=0.3$. On the left, the clusters are not tightly bounded by the thresholds. On the right, the clusters are more faithfully represented by their bounding boxes.]
+  )<fig:dtc_validity_example>
+
+The reason for this problem is that the leaf node containing the target cluster mainly consists of empty space, where the actual cluster only makes up a small part of the total area. This will lead to counterfactuals that are very likely to be closer to another cluster than the target. Here, we define a leaf's area as being a partition of the feature space limited by the maximum and minimum feature values and the thresholds which partitioned it. 
+
+To circumvent this problem we aim to improve the fidelity of the surrogate model by more faithfully explaining the clusters. We do this by adding further thresholds to more tightly encapsulate the clusters present in the dataset. To illustrate this idea, we show a resulting decision tree in the right plot in @fig:dtc_validity_example. In this plot, target cluster $0$'s area is more faithful to the points in that cluster. It is also clear that counterfactuals generated in this area would be more plausible than the initial counterfactual generated in the left plot. In the following section we go through the approach for improving the validity of TGCF by enhancing the fidelity of the surrogate model.
+
+=== Improving the fidelity of surrogate decision trees
+In this section we improve the fidelity of the Decision Tree Classifier (DTC)#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html] through a post-processing step of the surrogate model, but a similar modification can be made to IMM @dasguptaExplainableKMeansKMedians2020 or any other surrogate tree model. We call this step fidelity improvement.
+
+To improve fidelity of the model, we seek to find leaves like the bottom one in the left plot in @fig:dtc_validity_example, where the cluster only makes up a small part of the total area. We want to raise the granularity of this area by recursively creating new threshold splits and expanding the tree with new leaves such that the cluster is more tightly bounded. Concretely, we introduce a hyperparameter $phi in [0,1]$, such that the new areas contain a proportion $phi$ of the data points of the original areas. This is accomplished by splitting away the outermost points decided by the proportion $1-phi$. We do this to cut off any potential outliers and to create a more compact area containing the cluster.
+
+The first step is to calculate the bounds of each leaf's area. We do this by going from the leaf to the root of the tree, gathering information about threshold splits made to arrive at this leaf. Using this information, we calculate the maximum and minimum feature value for each area. If no threshold is made on a given feature of the path, e.g. to the left and right of cluster $0$ in the left plot of @fig:dtc_validity_example, we take the maximum and minimum feature value out of all data points. We call these values $max_i^j$ and $min_i^j$ for the maximum and minimum boundary on feature $i$ in leaf $j$. Using the information about different areas' feature spans and knowledge about which data points belong to which leaves, we calculate a span score for each feature $i$ for each leaf $j$, which is defined as follows: 
+
+$
+"span score"_i^j = (|"top"_i^j - "bot"_i^j|) / (|max_i^j - min_i^j|),
+$<eq:span_score>
+
+where the span score measures the amount of space a $phi$-proportion of the data makes up of the total range for the given feature in the given leaf. To calculate $"top"_i^j$ for leaf $j$, we first sort all data points in this area based on their $i$'th feature and take the data points around the median as dictated by the proportion $phi$. Thus, we remove a proportion of $(1-phi)\/2$ outermost points from either side. $"bot"_i^j$ and $"top"_i^j$ are then the smallest and largest values for feature $i$ in leaf $j$ of this range. After the span score for each feature has been found, we pick the feature with the lowest span score as the feature to partition in order to split the current leaf. This splitting procedure is then applied recursively to each new leaf.
+
+As our stopping condition for recursively splitting leaves, we set a hyperparameter $tau$ as the "cut span threshold", which means that we only split on a dimension $i$ if the span score is less than $tau$. In other words, for $phi=0.95$ and $tau=0.67$, we only further split a leaf on feature $i$ if $95%$ of the leaf's data makes up less than two thirds of the leaf's area.
+
+Finally, when we have finished splitting the leaves, we apply a filtering of the target leaves found in the algorithm. We do this to remove leaves in which a point is likely to be assigned to the wrong cluster, breaking validity. To accomplish this, we filter away leaves where the center of its area is not assigned to the target class by the clustering model. For example, the bottom-right area in the right plot of @fig:dtc_validity_example is one such leaf.
+
+By using this additional fidelity improvement step, we get more clearly defined areas, where plausible counterfactuals could be generated as can be seen in @fig:dtc_validity_example. 
 
 
-
-
+Given a surrogate decision tree trained on a clustering, we may expect that the TGCF algorithm would attain a high sparsity score by changing only features on the path from the first common ancestor to the target leaf. However, this is not always the case as is discussed in @sec:tree_comparison. We believe this happens since models like a Decision Tree Classifier are not forced to utilize few features. For very complex datasets, very large trees are generated, hereby imposing a large number of changed features in the generated counterfactual.

@@ -1,6 +1,6 @@
 #import "../lib.typ": *
-= Supervised Counterfactuals
-To create a baseline for our survey of current state-of-the-art counterfactual methods in the field of unsupervised learning, we will train a supervised surrogate model on the labels assigned by our black-box clustering method. This will enable us to use counterfactual methods for supervised models as a baseline reference, as the current field of unsupervised counterfactual methods doesn't have a lot of literature. This approach will enable us to compare the current literature with state-of-the-art methods for supervised counterfactuals. This approach might induce a trade-off in the quality of found counterfactuals as we will have to train surrogate models to approximate the clustering task.
+= Supervised counterfactuals<sec:supervised_methods>
+In this section, we outline two well-known existing methods for finding counterfactuals in a supervised setting. Since there exists very few methods for generating counterfactuals in an unsupervised setting, we use the supervised methods along with a classifier trained on the cluster labels in order to establish two baseline methods to compare other methods against. For one of these baseline methods, we use DiCE @mothilalExplainingMachineLearning2020, which is able to generate a set of highly diverse counterfactuals. For the second baseline we use BayCon @romashovBayConModelagnosticBayesian2022, which uses Bayesian optimization and also serves as the main building block for one of the few existing methods for the unsupervised setting presented in @spagnolCounterfactualExplanationsClustering2024.
 
 //== Guided By Prototypes<prototypes>
 //A state-of-the-art counterfactual method for supervised learning is presented in @vanlooverenInterpretableCounterfactualExplanations2021, in this paper they propose a fast model agnostic method for finding interpretable counterfactual explanations using class prototypes. In this paper the counterfactuals are generated to go from a specific class instance to any other class. 
@@ -14,85 +14,153 @@ To create a baseline for our survey of current state-of-the-art counterfactual m
 // To generate a counterfactual using Guided By Prototypes, they apply a fast iterative shrinkage-thresholding optimization algorithm called FISTA@amirbeckFastIterativeShrinkageThresholding. Where the counterfactual space is restricted to be in the data manifold. The FISTA algorithm iteratively updates the change $delta$, to the explained instance using momentum for $N$ optimization steps, and optimizes to find the best result for the objective function with a different label from the initial instance.
 
 
-== Dice
-In @mothilalExplainingMachineLearning2020 a counterfactual generation method is introduced that focuses on diversity and feasibility metrics in order to produce actionable counterfactuals. Even though Dice is not concerned with the clustering objective due to not considering the validity of the produced counterfactuals, the methods and procedures remains relevant. The paper is concerned with a variety of issues that affect counterfactual generation, one being that features are not independent of each other. let's say we have 2 features, income and marriage status. While these features may seem unrelated they are in fact not, as being married is often related to age and the amount of years the individual has been working. Another aspect is the existence of immutable features. A counterfactual might suggest changing your race or gender which is not just actionable, but also implies that certain biasses might exist in the training data.
+== DiCE <sec:dice>
+In @mothilalExplainingMachineLearning2020 DiCE is introduced as a method that focuses on diversity and similarity metrics in order to produce actionable counterfactuals. Although DiCE is strictly concerned with generating counterfactuals in a supervised setting, the methods and procedures remain relevant for clustering. The paper is concerned with a variety of issues that affect counterfactual generation, one being that features are not independent of each other. Imagine we have 2 features, income and marriage status. While these features might seem unrelated they are in fact not, as being married is often related to age and the amount of years the individual has been working. Another aspect is the existence of immutable features. For example, a counterfactual might suggest changing your race or gender which is not actionable. DiCE allows the user to mark these features as immutable, such that the generated counterfactuals do not modify them.
 
-In order to fix these issues DICE aims to produce diverse and feasible counterfactuals. The objective is to generate a set of counterfactuals ${c_1, c_2, dots , c_k }$ for some machine learning model $f$ on some instance $x$. In order to do this, DICE includes a diversity and feasibility metric into their generation method. Some features might however not be mutable in some range, meaning that some feature cannot go under or over a limit set by the user. DICE allows for such constraints as well.  @mothilalExplainingMachineLearning2020
+The objective of DiCE is to generate a set of counterfactuals $Z = {x'_1, x'_2, dots , x'_n }$ for a machine learning model $f$ on an instance $x$. In order to generate counterfactuals, DiCE includes a diversity and similarity metric into their generation method. However, certain features might not be mutable in some range, meaning that a feature cannot go under or over a limit set by the user. DiCE allows for such constraints as well.
 
-The diversity metric is used to generate diverse counterfactuals such that all combinations of feature changes are evenly distributed. This allows the user to pick the counterfactual that suits them the most. DICE defines diversity the following way:
-$ "dpp_diversity" = det(K) $
-where $K_(i,j) = 1 / (1 + d(c_i, c_j))$ and $d(a,b)$ denotes the distance between $a$ and $b$ according to some distance metric. This process is known as a determinantal point processes (DPP)@kuleszaDeterminantalPointProcesses2012. Given the marginal kernel $K$ which measures similarities between counterfactuals, then $det(K)$ measures the probability that the set of counterfactuals $C$ was picked amongst the set of all counterfactuals $C'$, $ P(C | C in C') = det(K_C) $ 
-Since highly similar points are unlikely to appear together, this measure will score higher on more diverse subsets of counterfactuals. @kuleszaDeterminantalPointProcesses2012
+The diversity metric is used to generate diverse counterfactuals, such that all combinations of feature changes are evenly distributed. DiCE defines the diversity of a set of counterfactuals in the following way:
+$ #text([dpp_diversity]) = det(K), $
+where $K_(i,j) = 1 / (1 + d(x'_i, x'_j))$ and $d(a,b)$ denotes the distance between $a$ and $b$ according to some distance metric. This process is known as a determinantal point processes (DPP) @kuleszaDeterminantalPointProcesses2012. Given the marginal kernel $K$, which measures similarities between counterfactuals, $det(K)$ approximates the probability that the set of counterfactuals $Z$ was picked amongst the set of all possible counterfactuals $Z'$, i.e.
+$ 
+P(Z | Z subset Z') approx det(K). 
+$
+For some instance $x$, one can imagine $Z'$ as all the possible counterfactuals that exist for the instance. Then, picturing $Z'$ as a box with its content evenly distributed, the probability of picking a subset of evenly distributed counterfactuals from the box is higher than picking a subset of similar counterfactuals. This probability is what dpp_diversity approximates. Therefore, the dpp_diversity of a set of counterfactuals is higher on more diverse sets @kuleszaDeterminantalPointProcesses2012.
 
-Feasibility is evaluated through a proximity measure, since a counterfactual that is closer to the instance $x$ will be easier for the end-user to act on. The proximity measure used to achieve feasibility is defined as the negative vector distance between the counterfactuals features and the responding features for the instance $x$:
-$ "Proximity" = -1/k sum^k_(i=1) d(c_i,x) $
-Sparsity is also a useful metric when evaluating actionable counterfactuals, since the amount of features that a user needs to change heavily impacts how easy it is to achieve. DICE does not include this metric in the loss function, but instead uses a post-hoc method. In essence, their method for enhancing sparsity is to greedily pick features in the counterfactual that differs from the instance $x$ and change them back. @mothilalExplainingMachineLearning2020
+Similarity is evaluated through a proximity measure, since a counterfactual that is closer to the instance $x$ will be easier for the end-user to act on. The proximity measure used to achieve similarity is defined as the negative distance between the counterfactual and the corresponding instance $x$:
+$ 
+"Proximity" = -1/n sum^n_(i=1) d(x'_i,x). 
+$
 
-With all this is mind, DICE define their loss function as follows:
-$ C(x) = arg min_(c_1,dots,c_k) 1/k sum^k_(i=1) "yloss"(f(c_i),y) + lambda_1/k sum^k_(i=1) d(c_i,x)\ - lambda_2 "dpp_diversity"(c_1, dots , c_k) $
+Sparsity is the measure of how few features are changed in a counterfactual compared to the instance. This is an important property, since needing to change fewer features in order to achieve a counterfactual reduces its complexity. DiCE does not include Sparsity in the loss function, but instead uses a post-hoc method. In essence, their method for enhancing sparsity is to greedily pick features in the counterfactual that differs from the instance $x$ and change them back @mothilalExplainingMachineLearning2020.
 
-Where the first term is the loss which minimizes the difference between the target label ($y$) and the actual counterfactual label $f(c_i)$. The second term is the feasibility metric and the last term is the diversity metric. In order to implement this objective function, they use gradient descent, followed by the above-mentioned post-hoc step in order to enhance the sparsity of the produced counterfactuals. @mothilalExplainingMachineLearning2020
+With all this is mind, DiCE defines their loss function as
+$ 
+C(x) = arg min_(c_1,dots,c_k) 1/k sum^k_(i=1) "yloss"(f(c_i),y) + lambda_1/k sum^k_(i=1) d(c_i,x)\ - lambda_2 "dpp_diversity"(c_1, dots , c_k), 
+$
+where the first term is the loss which minimizes the difference between the target label $y$ and the actual counterfactual label $f(c_i)$. The second term is the similarity metric and the last term is the diversity metric. In order to implement this objective function, they use gradient descent, followed by the post-hoc step mentioned above in order to enhance the sparsity of the produced counterfactuals @mothilalExplainingMachineLearning2020. 
 
-Lastly, DICE uses a filtering step in order to ensure all counterfactuals are feasible. This filtering step is necessary due to the issue of some features working in tandem with each other. This relation can be impossible to detect without domain-specific knowledge. Before generation of the counterfactuals a user can input pairs of features which are related to each other, in this way any counterfactual which alters one but not the other would be infeasible. These infeasible counterfactuals are then filtered such that only feasible counterfactuals remains. @mothilalExplainingMachineLearning2020
+Lastly, DiCE uses a filtering step in order to ensure all counterfactuals are feasible. In this context, a counterfactual is feasible if it does not change a feature in such a way as to make it impossible to achieve. Some features might be directly related to each other in a way such that changing one is not feasible without changing the other. These relations are the reason why the filtering step exists, as without filtering, counterfactuals where only one part of any such relation is changed are infeasible. This relation can be impossible to detect without domain-specific knowledge. Before generation of a counterfactual, a user can input pairs of features which are related to each other. In this way, any counterfactual which alters one but not the other would be infeasible. An example of such a relation is education and age, since a counterfactual that suggests achieving a higher education must also account for the increased age, as these are of course highly correlated @mothilalExplainingMachineLearning2020.
 
-== Baycon<sec:baycon>
-In @romashovBayConModelagnosticBayesian2022 they introduce a model-agnostic method for generating counterfactuals in supervised tasks called Baycon, which is based on Bayesian Optimization. In this paper Baycon will serve a dual purpose, first we will talk about Baycon's adaptation to the clustering task as introduced in @spagnolCounterfactualExplanationsClustering2024, and we will secondly use it as another baseline reference by training a supervised surrogate model on our clustering task.
+== BayCon<sec:baycon>
+In @romashovBayConModelagnosticBayesian2022 they introduce BayCon, a model-agnostic method for generating counterfactuals in supervised tasks, which is based on Bayesian Optimization. In this thesis, BayCon is used as a baseline method by training a classifier on the cluster labels. Additionally, it has also been adapted to the clustering task in  @spagnolCounterfactualExplanationsClustering2024, which presents one of the few unsupervised counterfactual generation methods in the field.
+
+BayCon makes use of an optimization objective constructed using three terms that implement desirable properties for a counterfactual. The objective function for a candidate counterfactual $x'$ and an instance $x$ is defined as
 
 $
-F(overline(c),overline(x)) = S_x * S_y * S_f
+F(x',x) = S_x dot S_y dot S_f,
 $<eq:baycon_obj>
+  
+where $S_x$ is the similarity in feature space calculated using Gower distance, $d_("Gower")$ @gowerGeneralCoefficientSimilarity1971. Gower distance is a metric used for mixed feature spaces, as it supports computation for categorical attributes. The term is calculated as
+$
+S_x (x',x) = 1 - d_("Gower")(x',x).
+$
 
-Baycon makes use of an optimization objective constructed using three terms that implement desirable properties for a counterfactual. The objective function can be seen in @eq:baycon_obj, for a counterfactual candidate $overline(c)$ and an explained instance $overline(x)$. In @eq:baycon_obj, $S_x$ is the "similarity in feature space" calculated using Gower distance, $d_("Gower")$ @gowerGeneralCoefficientSimilarity1971. Gower distance is a metric used for mixed feature spaces, as it supports computation for categorical attributes. The term is calculated as:
+The second term $S_y$ in @eq:baycon_obj measures the similarity in the output space, which we call validity. This property ensures that the counterfactual is predicted by the black-box model to be the requested target class. BayCon uses a hard scoring metric for this term, with 1 for correct labeling and 0 otherwise. The final term $S_f$ is the proportion of equal features between $x'$ and $x$ features; a term that guarantees sparsity for a found counterfactual. This term is calculated as
 
 $
-S_x(overline(c),overline(x)) = 1 - d_("Gower")(overline(c),overline(x))
-$
-
-The second term $S_y$ in @eq:baycon_obj ensures "similarity in the output space", which we call validity, a property that ensures that the counterfactual is predicted to be the requested class. Baycon uses a hard scoring metric for this term, with 1 for correct labeling and 0 otherwise. The final term $S_f$ called "Proportion of tweaked features" is a term that guarantees sparsity for a found counterfactual. The term is calculated as:
-
-$
-S_f(x',x^*)= ("# of equal feature values between" x' "and" x^* )/("# of features")
+S_f (x',x)= ("# of equal feature values between" x' "and" x )/("# of features").
 $
 
 // Could write about prior and posterior probabilities related to bayes' theorem
-To help with the counterfactual search, Baycon utilizes Bayesian Optimization. Bayesian Optimization is a useful tool when sampling or experimenting is expensive and you therefore want to be selective with the samples that you try out. It could e.g. be that for every experiment or sample you would have to make some kind of computation or prediction. In @fig:bayesian_optimization, a regression problem is visualized, where we want to fit a function to the observed points. On this graph the greyed out areas represent the uncertainty in the model, as we have not evaluated the objective function in these intervals. Exploring new candidate data points in these intervals can then help us to better fit our regression to the task at hand.
+To help with the counterfactual search, BayCon utilizes Bayesian Optimization. Bayesian Optimization is useful for efficiently optimizing an objective function where each evaluation is time-consuming, making methods like gradient descent impractical. It works by intelligently sampling points on which to evaluate the function, in order to obtain as much information about the function's structure as possible.
 
 #figure(
   image("../assets/bayesian optimization.png"),
-  caption: [Bayesian optimization example]
+  caption: [Bayesian optimization example, where the acquisition function scores highly in unexplored promising areas of the objective function.]
 )<fig:bayesian_optimization>
 
-Bayesian Optimization can be used to e.g. maximize or minimize a task, where the sampling of a new point can be based on what is called the acquisition function. For the example in @fig:bayesian_optimization, we are working with a maximization task, and the acquisition function helps us in finding new candidate data points to evaluate to achieve a higher maximization objective value. High values in the acquisition function can be seen as candidate points with a high probability of becoming a new global maximum. In Baycon they utilize Bayesian Optimization in conjunction with a surrogate model trained on the data as a means to sample the most promising candidate counterfactuals. This technique enables a guided search in the candidate counterfactual space, by finding regions with good counterfactuals. To estimate the objective function in Baycon they mention that this is typically done using a Gaussian Process(GP), but as GPs are quite computationally expensive they instead employ an ensemble regression model called Random Forest.
+In @fig:bayesian_optimization, a regression problem is visualized where we want to find an approximate maximum of the true function. On this graph, the shaded areas represent the uncertainty of the model, as the objective function has not been evaluated in these intervals. Exploring new candidate data points in these intervals can then help better fit our regression to the task at hand. New candidate points are sampled based on an acquisition function, shown in the bottom of @fig:bayesian_optimization. Since this example is for a maximization task, the acquisition function helps find new candidate data points to evaluate in order to achieve a higher objective value. High values in the acquisition function can be seen as candidate points with a high probability of becoming a new global maximum. 
 
-To then find a counterfactual for an instance, they then apply their iterative algorithm. In the first iteration, they generate candidate counterfactuals by changing each feature value, by sampling it using a normal distribution around the initial instance. After these counterfactuals have been generated and their objective scores have been calculated, they then use this information to train the Random Forest surrogate, to be used in conjunction with the acquisition function to guide future counterfactual search. In each iteration after this, the algorithm explores the current best counterfactuals and looks for better candidates in their neighborhoods, and prunes counterfactuals with worse objective scores. To increase sparsity, i.e., changing few features in counterfactual generation, they define that the chance of tweaking $n$ features should be twice as large as changing $n+1$ features. After no more improvements can be made or the maximum number of iterations have been run the algorithm terminates and outputs all found counterfactuals with an objective score larger than some predefined threshold. 
+In BayCon, they utilize Bayesian Optimization in conjunction with a surrogate model trained on the data as a means to sample the most promising candidate counterfactuals. This idea enables a guided search in the candidate counterfactual space, by finding regions with promising counterfactuals. To estimate the objective function in BayCon they mention that this is typically done using a Gaussian Process (GP), but as GPs are quite computationally expensive they instead employ a Random Forest ensemble regression model. Such a model still allows one to get the mean and variance around the output of the surrogate model by simply getting the mean prediction for each tree in the forest, and calculating the variance of them. With these values, the acquisition function finds the highest expected improvement of the current best objective value for each candidate counterfactual. These improvements are then scaled by the variance, where a higher uncertainty is preferred for two candidates with the same mean.
 
+To find a counterfactual for an instance, they apply an iterative algorithm. At each step, a set of candidate counterfactuals are generated. In order to obtain a higher sparsity, only a subset of features are selected for modification. To do this, they set the probability of changing $n$ features to be twice as large as changing $n+1$ features. After a set of features have been chosen, candidate counterfactuals are generated by randomly changing each feature value from this set, by sampling a normal distribution around the initial instance. 
 
+After the initial counterfactuals have been generated and their objective scores have been calculated, they use this information to train the Random Forest surrogate model. This surrogate model is used in conjunction with the acquisition function to guide future counterfactual search by estimating the objective function. In each iteration after this, the algorithm explores the current best counterfactuals and looks for better candidates in their neighborhoods. To do this, it prunes counterfactuals with worse objective scores, leaving only the counterfactuals that score higher in the objective function. After no more improvements can be made or the maximum number of iterations have been run, the algorithm terminates and outputs all found counterfactuals with an objective score larger than some predefined threshold.
 
+= Unsupervised counterfactual explanation #box[methods]<sec:unsupervised_counterfactual_methods>
 
-= Unsupervised Counterfactual explanation methods <sec:unsupervised_counterfactual_methods>
+In this section, we outline two existing methods capable of generating counterfactuals for clustering. To the best of our knowledge, these are the only methods that have been released in this specific field. The first method is a simple adaption of BayCon, which changes the objective function to handle clusterings instead of classification. The second method defines an objective function that can be optimized directly, without iterative methods.
 
+== BayCon adaption <sec:baycon_soft>
+In @spagnolCounterfactualExplanationsClustering2024 they suggest adapting BayCon @romashovBayConModelagnosticBayesian2022 to generate counterfactuals for the clustering task. This is done by modifying the calculation of the similarity in the output space ($S_y$), which is used in the objective function. They adapt it to an unsupervised setting based on the cluster structure, instead of being based on a black-box classification model. Additionally, they modify it to be a soft score between 0 and 1 instead of a binary score, in order to guide the search more effectively.
 
+Concretely, they introduce 2 model-specific soft scoring methods, and 1 model-agnostic soft scoring method:
+- The first model-specific scoring method is used for hierarchical density-based clustering algorithms like HDBSCAN. We will not further explain this method, as this thesis is primarily concerned with $k$-means clusterings.
+- The second model-specific method works for centroid-based clusterings and is based on distances, making it more suitable for our purpose.
+- The final method is model-agnostic, and is based on training a specific classifier to predict cluster membership probabilities, and then using these probabilities as soft scores.
+We expand on the second and third method below, and will be implementing them for comparison in the experiments in @sec:experiments.
 
-== Baycon utilizing soft scoring
-In @spagnolCounterfactualExplanationsClustering2024 they suggest adapting Baycon@romashovBayConModelagnosticBayesian2022 to generating counterfactuals for the clustering task, by adapting the objective function to utilizing soft scoring in its calculation of the "similarity in the output space"($S_y$), which is suitable for clustering models. 
-
-In @spagnolCounterfactualExplanationsClustering2024 they introduce 2 model-specific soft scores: one for hierarchical density-based clustering like HDBSCAN, this method uses probabilities for cluster membership, which is provided by the method. We will omit this soft scoring method, as we will not be surveying density-based counterfactual methods. The second model-specific method is used for k-means, which is a centroid-based clustering method, suitable for the topic of this paper. They additionally introduce one model-agnostic soft scoring method to be used together with any clustering method.
-
-In the centroid-based soft scoring they employ a measure based on the pairwise distance between candidate counterfactuals and cluster centroids or summaries. To calculate the score for a given counterfactual candidate they use the following formula:
+In the centroid-based soft scoring method, they employ a measure based on the distance between the candidate counterfactual and the target cluster center. To calculate the score for a given counterfactual candidate they use the formula
 
 $
-S_y (C F(x^*), C_t) = 1 - (d(C F(x^*),C_t) - min_t)/(max_t - min_t)
+S_y (x', c_"target") = 1 - (d(x',c_"target") - min_"target")/(max_"target" - min_"target"),
 $<eq:soft_scoring_kmeans>
 
-where $C_t$ is the target cluster, that we want our counterfactual to be assigned to. $min_t$ and $max_t$ are the minimum and maximum distances from that target cluster to any point in the corresponding cluster. To evaluate @eq:soft_scoring_kmeans we will also need a distance metric, where for non-categorical datasets we chose to employ euclidean distance, but usually one could use the same metric as used in the black box model. For values above $1$ or below $0$, they clip them to $1$ and $0$ respectively. @eq:soft_scoring_kmeans will give a $S_y$ in the interval $[0,1]$, which indicates whether our candidate counterfactual is approaching the summary or centroid of the target cluster.
+where $x'$ is the candidate counterfactual, $c_"target"$ is the target cluster center, and $d$ is the Euclidian distance. $min_"target"$ and $max_"target"$ are the minimum and maximum distances from the target cluster center $c_"target"$ to any point in the target cluster. Values above $1$ or below $0$ are clipped to $1$ and $0$, respectively. Thus, @eq:soft_scoring_kmeans will give a score in the interval $[0,1]$, which indicates whether a candidate counterfactual is approaching the center of the target cluster.
 
-To calculate the soft scoring for the model-agnostic method, they split the procedure up into two parts. Initially they extract representative points for each cluster using a method called "prototypes and criticisms"@kimExamplesAreNot, which is a method that is similar to coresets. To find these prototypes and criticisms we will have to use Maximum Mean Discrepancy (MMD), which measures the discrepancy between two different distributions, in this case we aim to minimize the discrepancy between the actual dataset and our prototypes. The specific approach that they use in the paper is called MMD-critic, this algorithm uses a procedure to systematically find both prototypes and criticisms. In each step the algorithm aims to minimize an MMD objective whilst ensuring that the chosen prototypes resemble the data manifold. Criticism selection functions as a second step after finding the prototypes, that picks criticisms to help scrutinize prototypes that diverge from other data instances. 
+To calculate a soft score for the model-agnostic method, they split the procedure into two parts. Initially, they extract representative points for each cluster using Prototypes and Criticisms @kimExamplesAreNot2016, which is a method similar to coresets that finds a subset of representatives for a cluster. These representatives are picked such that solving a problem on the representatives approximates a solution on the full dataset. Secondly, they train a classifier using the representatives in order to predict a membership probability for the target cluster. This probability is the soft score $S_y$.
 
-To use this approach, we made use of a python library implementing MMD-critic@maxMaxidlMMDcriticGitHub2020, where we used a $1:4$ ratio between criticisms and prototypes as suggested in the paper. The total amount of prototypes and criticisms generated for each cluster, should also be equal to $20%$ of the amount of points dedicated to that cluster, they mention that this percentage could also be seen as a hyperparameter. As the second step of the method, we will then feed these representative points to a Self-Training Classifier(STC).
+Expanding on the first step, the algorithm finds a subset of the data called the prototypes. It then finds points poorly represented by these prototypes and generates an additional set called the criticisms. These two sets work in conjunction to represent the data. 
 
-Semi supervised learning is a type of machine learning, which uses a small portion of labeled data to ground its predictions on or to gain domain background knowledge. It then uses unlabeled data to learn the shape of the data manifold, this can e.g. result in a more guided clustering task, which in turn should result in a model more capable of predicting new data. In the paper they chose to use a Self-Training Classifier. To use this model we will also need a base estimator, where in @spagnolCounterfactualExplanationsClustering2024 they opted to use an ensemble learning method called Extra Trees Classifier, which is similar to Random Forests, but with some desirable properties like: faster training and lower sensitivity to hyperparameters. Finally when a point is predicted using this STC it will output a vector of probabilities, designating the likelihood of belonging to each cluster, we can use the probability of a candidate counterfactual belonging to the target cluster as our soft score for the objective function. 
+To find the prototypes and criticisms, they use the Maximum Mean Discrepancy (MMD) @grettonKernelTwoSampleTest2012, which measures the discrepancy between two different distributions. In this case, we aim to minimize the discrepancy between the actual dataset and the prototypes. The specific approach that they use in the paper is called MMD-critic, which uses a procedure to systematically find both prototypes and criticisms. In each step, the algorithm aims to minimize an MMD objective whilst ensuring that the chosen prototypes resemble the data distribution. Criticism selection functions as a second step after finding the prototypes, where criticisms are chosen as points not represented well by the prototypes. This is done by selecting points where the distribution of the prototypes and the distribution of the data deviates the most.
 
-To find the actual counterfactual, now that we have defined our new soft scoring metrics, we can just follow the procedure as introduced in @sec:baycon.
+For the implementation in this thesis, we use a python library implementing MMD-critic @maxMaxidlMMDcriticGitHub2020, where we use a $1:4$ ratio between criticisms and prototypes as suggested in the paper. The total amount of prototypes and criticisms generated for each cluster is set to $20%$ of the size of that cluster. 
 
-== CFClust
+As the second step of the method, the representative points are given to a Self-Training Classifier#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.semi_supervised.SelfTrainingClassifier.html] (STC). This type of model allows a supervised classifier to function as a semi-supervised classifier, which uses a small portion of labeled data to ground its predictions or to gain domain background knowledge. This allows the model to perform well when predicting cluster labels for unseen data.
 
+To use this model, a base estimator is needed for the STC, where they opted to use an Extra Trees Classifier#footnote[https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html], which is a tree-based ensemble model. This model is similar to a Random Forest, but with some desirable properties like faster training and lower sensitivity to hyperparameters @spagnolCounterfactualExplanationsClustering2024. Finally, when a point is predicted using the STC, it will output a vector of probabilities, designating the likelihood of belonging to each cluster. The probability of a candidate counterfactual belonging to the target cluster is then used as the soft score $S_y$ in the objective function. The remainder of the algorithm is exactly as in the original BayCon algorithm, outlined in @sec:baycon.
+
+== CFClust<sec:cfclust>
+The CFClust algorithm, published in @vardakasCounterfactualExplanationsKmeans2025, takes an alternative approach to generating counterfactuals for the clustering task, specifically $k$-means and Gaussian clustering, although we focus on their approach to $k$-means given the subject of this thesis. The method they present accounts for immutable features and tries to create plausible counterfactuals, meaning they should not be an outlier in the cluster they belong to.
+
+The main property of the CFClust method is that it generates counterfactuals using a non-iterative method for $k$-means clusters using Euclidian distance. Therefore, the method is very efficient, but does not generate multiple counterfactuals for a single instance like the DiCE- or BayCon-based methods discussed previously. They introduce a general definition of counterfactuals for model-based clusterings that encapsulates both $k$-means and Gaussian clusterings by noting that $k$-means can be considered a special case of Gaussian clustering.
+
+The general definition they present is based around each cluster $C_0,...,C_(k-1)$ having an associated probability density function $p_0,...,p_(k-1)$ as well as a prior probability $pi_0,...,pi_(k-1)$. With these, the cluster assignment rule states that a point $x$ is assigned to the cluster $l$ which maximizes $pi_l p_l (x)$. With these definitions, a Gaussian clustering simply means that $p_j (x) = N(x; mu_j, S_j)$ i.e. the density function is normally distributed with mean $mu_j$ and covariance matrix $S_j$. $k$-means clustering is simply a special case of this with $pi_0 = pi_1 = ... = pi_(k-1)$ and $S_i = I "for" i=0,...,k-1$.
+
+With this model for clustering, they define a preference density $r(y|x)$ expressing the preference for $y$ to become a counterfactual for $x$. Importantly, this preference density should be an unimodal distribution. Using the preference density, their general definition of a counterfactual $x'$ for an instance $x in C_j$ is as follows:
+$
+x' = arg max_y r(y|x) \
+"s.t." \
+C_l eq.not C_j "where " l = arg max_(m = 0..k-1) pi_m p_m (x').
+$
+
+To generate counterfactuals they use the preference function 
+$ r(y|x) = exp(-d(x,y)), $
+where $d$ is the squared Euclidian distance, meaning the distance should be minimized in order to find a counterfactual according to the problem formulation above. To account for plausibility, they introduce a user-defined parameter $epsilon$, where $epsilon = 0$ means the counterfactual will be found directly on the boundary between the instance and target clusters. Together, these parameters and the clustering form the constraint set $C S_epsilon$, which is the set of points where the counterfactual can be located. For example, if $epsilon=0$, then the constraint set is simply the boundary. To account for immutable features, they introduce an indicator vector $M$ where $M_i = 1$ means feature $i$ is actionable, and $M_i=0$ means it is immutable. 
+
+To solve the optimization problem of maximizing the preference function, they introduce an analytical solution for $k$-means, and a method that requires solving a non-linear equation system for the more general Gaussian clustering case. We will focus primarily on their solution to the $k$-means problem. 
+
+For $k$-means, they define the constraint set as follows, given source and target centers $c_"source"$ and $c_"target"$:
+$
+C S_epsilon = {x': |x' - c_"source"|^2 = |x' - c_"target"|^2 + epsilon |c_"target" - c_"source"|^2} ,#h(5pt) epsilon >= 0.
+$
+The constraints can be written as an equation of the form
+$
+x'^T v = c,
+$
+where
+$
+v &= c_"source" - c_"target" \
+c &= (|c_"source"|^2 - |c_"target"|^2 - epsilon|c_"target" - c_"source"|^2) / 2.
+$
+Finally, by splitting the vectors $x'$ and $v$ into sub-vectors comprised of their actionable and immutable features, respectively, one can write
+$
+x'_A^T v_A + x_I^T v_I = c
+$
+since $x'_I = x_I$. We are left with the following optimization problem to solve:
+$
+min_(x'_A) #h(5pt) |x'_A - x_A|^2 \
+"s.t." \
+x'_A^T v_A = c - x_I^T v_I,
+$
+which is a quadratic minimization with a linear constraint that can be solved analytically. In @fig:cfclust they present example counterfactuals found using this method. By varying the immutable features and the $epsilon$ parameter, one gets different counterfactuals, with $epsilon=1$ yielding a counterfactual near the target center, and $epsilon=0$ yielding one directly on the boundary. 
+
+#figure(
+  image("../assets/CFClust.png", width: 70%),
+  caption: [
+    Example counterfactuals generated by CFClust for a $k$-means clustering @vardakasCounterfactualExplanationsKmeans2025.
+  ]
+)<fig:cfclust>
+
+As the authors of the method are still refining the implementation of these concepts, we have not been able to test the method in this thesis. However, in their own experiments they found promising results while comparing to a baseline of using DiCE @mothilalExplainingMachineLearning2020 and GuidedByPrototypes @vanlooverenInterpretableCounterfactualExplanations2021 on a logistic regression classifier with a decision hyperplane corresponding to the boundary between the source and target cluster. The CFClust method generates slightly better counterfactuals than the baselines, with the gap between them increasing on higher dimensional datasets. The main advantage of the CFClust method is the computation time, which they found to be below 0.001 seconds for both the Iris, Wine, and Pendigits datasets @iris_53 @wine_109 @Alpaydin1998penbased. 
